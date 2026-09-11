@@ -18,8 +18,6 @@ from telemachy.models import WorkflowSpec
 _TEAM_TASKS_RE = re.compile(r"^/v1/teams/(?P<tid>[^/]+)/tasks$")
 _TEAM_TASK_RE = re.compile(r"^/v1/teams/(?P<tid>[^/]+)/tasks/(?P<task_id>[^/]+)$")
 _TEAM_MEMBERS_RE = re.compile(r"^/v1/teams/(?P<tid>[^/]+)$")
-_AGENT_START_RE = re.compile(r"^/v1/agents/(?P<aid>[^/]+)/start$")
-_AGENT_STOP_RE = re.compile(r"^/v1/agents/(?P<aid>[^/]+)/stop$")
 _AGENT_DELETE_RE = re.compile(r"^/v1/agents/(?P<aid>[^/]+)$")
 
 

@@ -28,10 +28,10 @@ class AuditSinkProtocol(Protocol):
     """Protocol for audit sinks — dependency-injected into WorkflowExecutor."""
 
     def emit(self, event_type: str, *, workflow_id: str | None = None, **fields: Any) -> None:
-        ...
+        """Emit one audit event."""
 
     def close(self) -> None:
-        ...
+        """Close the sink."""
 
 
 class NullSink:

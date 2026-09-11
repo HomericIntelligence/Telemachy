@@ -66,7 +66,7 @@ class TelemachyDefaultHandler(logging.StreamHandler):
 # === Metrics ===
 
 _metrics_lock = threading.Lock()
-_metrics_started = False
+_started_metrics_ports: set[int] = set()
 
 
 def setup_metrics(port: int) -> None:
@@ -75,12 +75,11 @@ def setup_metrics(port: int) -> None:
     Single-process assumption: Telemachy is a one-shot CLI. Multi-process
     forking is not supported by this module; a fresh process resets state.
     """
-    global _metrics_started
     with _metrics_lock:
-        if _metrics_started:
+        if port in _started_metrics_ports:
             return
         start_http_server(port)
-        _metrics_started = True
+        _started_metrics_ports.add(port)
 
 
 WORKFLOWS_STARTED = Counter(
@@ -116,7 +115,7 @@ AGAMEMNON_LATENCY = Histogram(
 # === Tracing ===
 
 _tracing_lock = threading.Lock()
-_tracing_started = False
+_started_tracing_services: set[str] = set()
 
 
 def setup_tracing(service_name: str) -> None:
@@ -126,15 +125,14 @@ def setup_tracing(service_name: str) -> None:
     telemachy.config.Settings). OTLP exporter is a planned follow-up;
     not wired to avoid pulling grpcio.
     """
-    global _tracing_started
     with _tracing_lock:
-        if _tracing_started:
+        if service_name in _started_tracing_services:
             return
         provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
         provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
         trace.set_tracer_provider(provider)
         HTTPXClientInstrumentor().instrument()
-        _tracing_started = True
+        _started_tracing_services.add(service_name)
 
 
 def get_tracer() -> Tracer:

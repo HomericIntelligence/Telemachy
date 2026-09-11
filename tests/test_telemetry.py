@@ -14,6 +14,8 @@ from telemachy.telemetry import (
     JsonFormatter,
     SafePlainFormatter,
     WorkflowContextLogFilter,
+    _started_metrics_ports,
+    _started_tracing_services,
     get_tracer,
     setup_metrics,
     setup_tracing,
@@ -172,10 +174,9 @@ def test_json_formatter_safe_without_filter() -> None:
 @pytest.fixture(autouse=True)
 def reset_metrics_state() -> None:
     """Reset metrics state between tests."""
-    import telemachy.telemetry
 
-    telemachy.telemetry._metrics_started = False
-    telemachy.telemetry._tracing_started = False
+    _started_metrics_ports.clear()
+    _started_tracing_services.clear()
 
 
 def test_setup_metrics_idempotent() -> None:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -106,8 +105,9 @@ class TestNatsMonitorBasics:
         await asyncio.wait_for(wait_done.wait(), timeout=1.0)
 
         task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
+        # Wait for the cancelled task to finish unwinding; CancelledError
+        # is expected and swallowed by gather.
+        await asyncio.gather(task, return_exceptions=True)
 
 
 class TestNatsMonitorMessageHandling:

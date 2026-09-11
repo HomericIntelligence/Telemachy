@@ -6,7 +6,7 @@ channels = ["conda-forge"]
 platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
 
 [dependencies]
-python = ">=3.10"
+python = ">=3.13,<3.14"
 
 [pypi-dependencies]
 telemachy         = { path = ".", editable = true }
@@ -21,6 +21,7 @@ opentelemetry-api                = ">=1.25"
 opentelemetry-sdk                = ">=1.25"
 opentelemetry-instrumentation-httpx = ">=0.46b0"
 mcp                                 = ">=1.0,<2.0"
+cryptography                    = ">=50"
 nats-py                          = ">=2.7"
 
 [tasks]

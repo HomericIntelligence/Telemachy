@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 import re
 import signal
@@ -291,8 +290,9 @@ def run(
                     result = await executor.execute(spec, workflow_id=workflow_id)
                 finally:
                     watcher.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await watcher
+                    # Wait for the cancelled watcher to finish unwinding;
+                    # CancelledError is expected and swallowed by gather.
+                    await asyncio.gather(watcher, return_exceptions=True)
                     store.clear_cancel(workflow_id)
 
         if result.status == "completed":

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "telemachy"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.13,<3.14"
 
 [project.scripts]
 telemachy = "telemachy.cli:main"

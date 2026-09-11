@@ -17,17 +17,6 @@ from typing import Any
 from telemachy.agamemnon_client import AgamemnonClient
 from telemachy.config import settings
 
-# Recorded in step 1's spike gate (see implementation_order). Updated to match
-# the installed `mcp` SDK before `build_server()` is wired in step 4.
-_SDK_API_NOTES = """
-mcp SDK 1.x API used by build_server():
-- mcp.server.Server(name) — server factory
-- @server.list_tools() decorator on async () -> list[Tool]
-- @server.call_tool() decorator on async (name, arguments) -> list[TextContent]
-- mcp.server.stdio.stdio_server() — async context yielding (read, write) streams
-- mcp.types.Tool, mcp.types.TextContent — return types
-"""
-
 
 @dataclass
 class _ToolDescriptor:

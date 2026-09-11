@@ -3,6 +3,7 @@ name: Required Checks
 on:
   push:
     branches: [main]
+
   pull_request:
     branches: [main]
 
@@ -11,12 +12,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
   forbid-suppressions:
     name: forbid-suppressions
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: "Reject silent-failure workaround in shell/YAML/Dockerfile/justfile/HCL"
         run: |
@@ -65,188 +67,170 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          pixi-version: v0.70.2
-          cache: true
-      - name: Lint (ruff)
-        run: pixi run ruff check src tests
+          fetch-depth: 1
 
-      - name: Type-check (mypy)
-        run: pixi run mypy src/telemachy --ignore-missing-imports
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
 
-      - name: Lint YAML
-        run: |
-          pip install yamllint --quiet
-          yamllint -c .yamllint.yaml .
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-lint`.
+      - name: lint (in container)
+        run: bash scripts/run_ci_local.sh lint
 
   markdownlint:
     name: markdownlint
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    needs: lint
-    permissions:
-      contents: read
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - name: Run markdownlint-cli2
-        uses: DavidAnson/markdownlint-cli2-action@8de2aa07cae85fd17c0b35642db70cf5495f1d25  # v20.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          # markdownlint-cli2 does NOT read .markdownlintignore (that file
-          # only applies to markdownlint-cli v1) — exclusions must be
-          # negation globs here. Keep in sync with .markdownlintignore.
-          globs: |
-            **/*.md
-            !.claude-followup-*.md
-            !.claude-prompt-*.md
-            !.pixi/**
-          config: ".markdownlint.yaml"
+          fetch-depth: 1
+
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
+
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-markdownlint`.
+      - name: markdownlint (in container)
+        run: bash scripts/run_ci_local.sh markdownlint
 
   pixi-check:
     name: pixi-check
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
-    needs: lint
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - name: Skip if no pixi.toml
-        id: detect
-        shell: bash
-        run: |
-          if [ ! -f pixi.toml ]; then
-            echo "::notice::No pixi.toml in repo, skipping pixi-check"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Setup pixi
-        if: steps.detect.outputs.skip == 'false'
-        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          pixi-version: v0.70.2
-          cache: true
-      - name: pixi install (locked)
-        if: steps.detect.outputs.skip == 'false'
-        shell: bash
-        run: |
-          if [ -f pixi.lock ]; then
-            pixi install --locked
-          else
-            echo "::warning::pixi.toml present but pixi.lock missing — running unlocked"
-            pixi install
-          fi
+          fetch-depth: 1
+
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
+
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-pixi-check`.
+      - name: pixi-check (in container)
+        run: bash scripts/run_ci_local.sh pixi-check
 
   justfile-check:
     name: justfile-check
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    needs: lint
-    permissions:
-      contents: read
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - name: Skip if no justfile
-        id: detect
-        run: |
-          if [ ! -f justfile ] && [ ! -f Justfile ]; then
-            echo "::notice::No justfile in repo, skipping justfile-check"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Install just
-        if: steps.detect.outputs.skip == 'false'
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          just-version: "1.36.0"
-      - name: Validate justfile
-        if: steps.detect.outputs.skip == 'false'
-        run: |
-          just --evaluate >/dev/null
-          just --list >/dev/null
+          fetch-depth: 1
+
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
+
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-justfile-check`.
+      - name: justfile-check (in container)
+        run: bash scripts/run_ci_local.sh justfile-check
 
   symlink-check:
     name: symlink-check
     runs-on: ubuntu-24.04
-    timeout-minutes: 3
-    needs: lint
-    permissions:
-      contents: read
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - name: Run symlink check
-        run: bash scripts/check-symlinks.sh
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
+
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-symlink-check`.
+      - name: symlink-check (in container)
+        run: bash scripts/run_ci_local.sh symlink-check
 
   unit-tests:
     name: unit-tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          pixi-version: v0.70.2
-          cache: true
-      - name: Run pytest
-        run: pixi run pytest --tb=short -q --cov=telemachy --cov-report=term-missing --cov-fail-under=75
+          fetch-depth: 1
+
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
+
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-unit-tests`.
+      - name: unit-tests (in container)
+        run: bash scripts/run_ci_local.sh unit-tests
 
   integration-tests:
     name: integration-tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          pixi-version: v0.70.2
-          cache: true
-      - name: Validate workflow YAML files are well-formed
-        run: |
-          pixi run python -c "
-          import yaml, glob, sys
-          files = glob.glob('workflows/**/*.yaml', recursive=True) + glob.glob('workflows/**/*.yml', recursive=True)
-          if not files:
-              print('No workflow YAML files found — skipping validation')
-              sys.exit(0)
-          errors = []
-          for f in files:
-              try:
-                  yaml.safe_load(open(f))
-                  print(f'OK: {f}')
-              except yaml.YAMLError as e:
-                  errors.append(f'{f}: {e}')
-          if errors:
-              print('FAILED:')
-              for err in errors:
-                  print(err)
-              sys.exit(1)
-          print(f'All {len(files)} workflow YAML file(s) are valid.')
-          "
-      - name: Validate workflow files against Telemachy schema
-        # If schema export fails, fail loudly rather than silently
-        # downgrading to YAML-parse-only — see #150.
-        run: |
-          set -euo pipefail
-          if ! pixi run python -m telemachy.cli schema -o /tmp/telemachy-schema.json >/tmp/telemachy-schema.out 2>/tmp/telemachy-schema.err; then
-            echo "::error::Schema export failed; refusing to fall back to YAML-parse-only."
-            if [ -s /tmp/telemachy-schema.err ]; then
-              cat /tmp/telemachy-schema.err >&2
-            fi
-            exit 1
-          fi
-          pip install check-jsonschema --quiet
-          mapfile -t workflow_files < <(find workflows \( -name "*.yaml" -o -name "*.yml" \))
-          if [ "${#workflow_files[@]}" -eq 0 ]; then
-            echo "No workflow files to validate"
-          else
-            check-jsonschema --schemafile /tmp/telemachy-schema.json "${workflow_files[@]}"
-          fi
+          fetch-depth: 1
+
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
+
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-integration-tests`.
+      - name: integration-tests (in container)
+        run: bash scripts/run_ci_local.sh integration-tests
 
   test:
     name: test
@@ -264,67 +248,78 @@ jobs:
   security-dependency-scan:
     name: security/dependency-scan
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write  # trivy SARIF upload needs code-scanning write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          pixi-version: v0.70.2
-          cache: true
-      - name: Run pip-audit on project dependencies
-        run: |
-          pip install pip-audit --quiet
-          pixi run python -c "
-          import importlib.metadata, sys
-          dists = importlib.metadata.distributions()
-          lines = [f'{d.metadata[\"Name\"]}=={d.metadata[\"Version\"]}' for d in dists
-                   if d.metadata.get('Name') and d.metadata.get('Version')]
-          sys.stdout.write('\n'.join(lines) + '\n')
-          " | grep -viE '^telemachy==' > /tmp/requirements-freeze.txt
-          pip-audit -r /tmp/requirements-freeze.txt --skip-editable
+          fetch-depth: 1
+
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
+
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-security-dependency-scan`.
+      - name: security-dependency-scan (in container)
+        run: bash scripts/run_ci_local.sh security-dependency-scan
 
   security-secrets-scan:
     name: security/secrets-scan
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write  # gitleaks SARIF upload needs code-scanning write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Install Gitleaks
-        run: |
-          GITLEAKS_VERSION=8.30.1
-          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-          ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')
-          BASE_URL="https://github.com/gitleaks/gitleaks/releases/download"
-          FILE="gitleaks_${GITLEAKS_VERSION}_${OS}_${ARCH}.tar.gz"
-          curl -sSfL "${BASE_URL}/v${GITLEAKS_VERSION}/${FILE}" \
-            | tar -xz -C /usr/local/bin gitleaks
-          gitleaks version
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
 
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       - name: Run Gitleaks
         run: |
           if [ -f .gitleaks.toml ]; then
-            gitleaks detect --source . --config .gitleaks.toml \
-              --report-format sarif --report-path gitleaks.sarif
+            podman run --rm --userns=keep-id:uid=1000,gid=1000 \
+              -v "$PWD:/workspace:Z" -w /workspace telemachy-ci:local \
+              gitleaks detect --source /workspace --config .gitleaks.toml \
+                --report-format sarif --report-path gitleaks.sarif --redact
           else
-            gitleaks detect --source . \
-              --report-format sarif --report-path gitleaks.sarif
+            podman run --rm --userns=keep-id:uid=1000,gid=1000 \
+              -v "$PWD:/workspace:Z" -w /workspace telemachy-ci:local \
+              gitleaks detect --source /workspace \
+                --report-format sarif --report-path gitleaks.sarif --redact
           fi
 
       - name: Upload Gitleaks SARIF
         if: always() && hashFiles('gitleaks.sarif') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3  # v3
         with:
-          name: gitleaks-report
-          path: gitleaks.sarif
-          retention-days: 90
+          sarif_file: gitleaks.sarif
 
   security-sast-scan:
     name: security/sast-scan
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           pixi-version: v0.70.2
           cache: true
@@ -342,8 +337,8 @@ jobs:
     name: build
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           pixi-version: v0.70.2
           cache: true
@@ -391,7 +386,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.13'
       - name: Download dist artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -437,8 +435,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           pixi-version: v0.70.2
           cache: true
@@ -515,72 +513,47 @@ jobs:
   schema-validation:
     name: schema-validation
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - name: Validate GitHub Actions workflow YAML against JSON schema
-        run: |
-          pip install check-jsonschema --quiet
-          find .github/workflows -name "*.yml" | \
-            xargs check-jsonschema \
-              --schemafile https://json.schemastore.org/github-workflow
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
+
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-schema-validation`.
+      - name: schema-validation (in container)
+        run: bash scripts/run_ci_local.sh schema-validation
 
   deps-version-sync:
     name: deps/version-sync
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          pixi-version: v0.70.2
-          cache: true
-      - name: Verify pyproject.toml version is parseable and consistent
-        run: |
-          pixi run python -c "
-          import ast, glob, pathlib, sys, tomllib
+          fetch-depth: 1
 
-          # Source of truth: pyproject.toml [project].version
-          data = tomllib.load(open('pyproject.toml', 'rb'))
-          version = data['project']['version']
-          print(f'pyproject.toml version: {version}')
+      - name: Cache podman container storage
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.local/share/containers/storage
+          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
+          restore-keys: |
+            podman-telemachy-${{ runner.os }}-
 
-          confirmations = 0
-
-          # Optional VERSION file
-          version_file = pathlib.Path('VERSION')
-          if version_file.exists():
-              file_ver = version_file.read_text().strip()
-              if file_ver != version:
-                  print(f'ERROR: VERSION file ({file_ver}) != pyproject.toml ({version})')
-                  sys.exit(1)
-              print(f'VERSION file matches: {file_ver}')
-              confirmations += 1
-
-          # Every src/**/__init__.py MUST expose __version__ matching pyproject.toml.
-          # See #177: the previous 'if \"__version__\" in content' check silently
-          # no-op'd when the symbol was absent, so the gate passed for the wrong reason.
-          init_files = sorted(glob.glob('src/**/__init__.py', recursive=True))
-          if not init_files and not version_file.exists():
-              print('ERROR: no src/**/__init__.py and no VERSION file — '
-                    'cannot verify version sync. See #177.')
-              sys.exit(1)
-
-          for init_file in init_files:
-              tree = ast.parse(open(init_file).read())
-              found = None
-              for node in ast.walk(tree):
-                  if isinstance(node, ast.Assign):
-                      for target in node.targets:
-                          if isinstance(target, ast.Name) and target.id == '__version__':
-                              found = ast.literal_eval(node.value)
-              if found is None:
-                  print(f'ERROR: {init_file} has no top-level __version__ assignment. '
-                        f'Define __version__ = \"{version}\" or add a VERSION file. See #177.')
-                  sys.exit(1)
-              if found != version:
-                  print(f'ERROR: {init_file} __version__ ({found}) != pyproject.toml ({version})')
-                  sys.exit(1)
-              print(f'{init_file} __version__ matches: {found}')
-              confirmations += 1
-
-          print(f'Version sync OK ({confirmations} source(s) confirmed)')
-          "
+      - name: Build CI image (podman)
+        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+      # All checks run inside the CI container — the same image developers
+      # use via `just ci-deps-version-sync`.
+      - name: deps-version-sync (in container)
+        run: bash scripts/run_ci_local.sh deps-version-sync
