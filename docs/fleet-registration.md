@@ -41,6 +41,10 @@ Fleet durability contract. Fleet callers must select this explicit command or
    expiration, discard-new policy, and a duplicate window of at least 120
    seconds. This command validates that configuration; it never creates,
    replaces, or changes a stream. Missing/incompatible streams fail closed.
+   A positive `MaxMsgsPerSubject` also requires `DiscardNewPerSubject=true`;
+   otherwise NATS can evict a previous registration even with stream-level
+   discard-new. A full compatible stream rejects new work while retaining the
+   prior message; the outbox remains pending until publication is confirmed.
 6. Preview without credentials, network requests, or mutations:
 
    ```bash

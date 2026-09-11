@@ -23,12 +23,19 @@ class RegistrationError(RuntimeError):
 
 
 class IssueGateway(Protocol):
-    async def get_issue(self, repo: str, number: int) -> dict[str, Any]: ...
+    async def get_issue(self, repo: str, number: int) -> dict[str, Any]:
+        """Read the authoritative issue or raise an explicit upstream failure."""
+
     async def update_issue(
         self, repo: str, number: int, expected_body: str, body: str
-    ) -> dict[str, Any]: ...
-    async def create_issue(self, repo: str, title: str, body: str) -> dict[str, Any]: ...
-    async def find_issues(self, repo: str, marker: str) -> list[dict[str, Any]]: ...
+    ) -> dict[str, Any]:
+        """Confirm the exact replacement body under the single-writer boundary."""
+
+    async def create_issue(self, repo: str, title: str, body: str) -> dict[str, Any]:
+        """Attempt one issue creation without automatically retrying a mutation."""
+
+    async def find_issues(self, repo: str, marker: str) -> list[dict[str, Any]]:
+        """Return matching open and closed issues or fail without implying absence."""
 
 
 class Receipt(BaseModel):

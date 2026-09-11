@@ -19,6 +19,7 @@ from telemachy.fleet_registration import (
     register_fleet_epic,
     registration_template,
 )
+from telemachy.workflow_input import load_workflow, validate_workflow_path
 
 
 def register_fleet_epic_cmd(
@@ -46,10 +47,8 @@ def register_fleet_epic_cmd(
     This does not create the first epic or execute workflow tasks. Only one
     writer may register a given epic; GitHub issue PATCH is not an atomic lock.
     """
-    from telemachy.cli import _load_workflow, _validate_workflow_path
-
-    _validate_workflow_path(workflow_path)
-    spec = _load_workflow(workflow_path)
+    validate_workflow_path(workflow_path)
+    spec = load_workflow(workflow_path)
     try:
         marker = registration_template(registration_key)
         GitHubIssueGateway._path(repo, epic_issue)

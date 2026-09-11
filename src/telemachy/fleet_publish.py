@@ -36,6 +36,7 @@ async def publish_registration(
             config.storage != StorageType.FILE
             or config.retention != RetentionPolicy.LIMITS
             or config.discard != DiscardPolicy.NEW
+            or (config.max_msgs_per_subject > 0 and not config.discard_new_per_subject)
             or config.max_age != 0
             or config.duplicate_window is None
             or config.duplicate_window < 120

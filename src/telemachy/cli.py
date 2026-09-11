@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import signal
 import uuid
 from pathlib import Path
 from typing import Annotated
 
 import typer
-import yaml
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -22,6 +20,8 @@ from telemachy.config import settings
 from telemachy.executor import WorkflowExecutor, run_workflow
 from telemachy.fleet_cli import register_fleet_epic_cmd
 from telemachy.models import WorkflowSpec
+from telemachy.workflow_input import load_workflow as _load_workflow
+from telemachy.workflow_input import validate_workflow_path as _validate_workflow_path
 
 app = typer.Typer(
     name="telemachy",
@@ -84,43 +84,6 @@ def _setup_logging() -> None:
         setup_tracing(settings.otel_service_name)
     if settings.metrics_enabled:
         setup_metrics(settings.metrics_port)
-
-
-_SHELL_METACHARACTERS: re.Pattern[str] = re.compile(r"[;&|$`><(){}\[\]!?*~\\]")
-
-
-def _validate_workflow_path(path: Path) -> None:
-    """Validate that *path* is safe to use as a workflow file path.
-
-    Raises :class:`typer.BadParameter` if the path string contains shell
-    metacharacters, or if the resolved path does not point to an existing file.
-    """
-    raw = str(path)
-    if _SHELL_METACHARACTERS.search(raw):
-        raise typer.BadParameter(f"Workflow path contains disallowed shell metacharacters: {raw!r}")
-    if not path.exists():
-        raise typer.BadParameter(f"Workflow file not found: {raw!r}")
-    if not path.is_file():
-        raise typer.BadParameter(f"Workflow path is not a file: {raw!r}")
-
-
-def _load_workflow(workflow_path: Path) -> WorkflowSpec:
-    """Parse and validate a workflow YAML file into a WorkflowSpec."""
-    if not workflow_path.exists():
-        err_console.print(f"[red]File not found:[/red] {workflow_path}")
-        raise typer.Exit(1)
-
-    try:
-        raw = yaml.safe_load(workflow_path.read_text())
-    except yaml.YAMLError as exc:
-        err_console.print(f"[red]YAML parse error:[/red] {exc}")
-        raise typer.Exit(1) from exc
-
-    try:
-        return WorkflowSpec.model_validate(raw)
-    except Exception as exc:
-        err_console.print(f"[red]Workflow schema error:[/red] {exc}")
-        raise typer.Exit(1) from exc
 
 
 def _print_plan(spec: WorkflowSpec) -> None:

@@ -46,11 +46,24 @@ off (see "Handoff" below).
   documented in the "Architecture" section below. The handoff payload to
   Agamemnon is the AgentSpec / TeamSpec / TaskSpec record validated by
   `telemachy.models`.
+- **Fleet registration:** `just fleet-register` / `register-fleet-epic` and
+  `telemachy.fleet_registration.register_fleet_epic` accept a reviewed workflow,
+  an existing canonical epic, and its explicit registration marker. They persist
+  child creation and publication progress in that epic, then send the frozen
+  `hi/v1` envelope to `hi.pipeline.epic.{epic_key}.registered` through Keystone's
+  JetStream transport. An actual PubAck is required. Agamemnon's durable intake
+  owns graph creation, dispatch, replay, and parent wakeups. The registration
+  block never owns task decisions or Hephaestus stage labels.
+  See [the Fleet registration contract](docs/fleet-registration.md) for retry,
+  exact-byte integration, configuration, and evidence limits.
 
 ## Inter-agent message contracts
 
 - All Agamemnon HTTP calls use `httpx.AsyncClient`; payloads conform to
   ProjectAgamemnon's published OpenAPI shape.
+- Fleet registration publishes through the existing `homeric-pipeline` stream;
+  it validates retention and never provisions or changes a stream. This is
+  separate from task-completion monitoring.
 - Future NATS-based completion monitoring will subscribe to subjects
   documented in Odysseus `docs/adr/005-nats-subject-schema.md`. Until
   that lands Telemachy polls Agamemnon via HTTP.
@@ -65,6 +78,12 @@ off (see "Handoff" below).
    workflow is a no-op.
 4. **Pure planning.** `just plan` and `just validate` never mutate
    Agamemnon state.
+5. **Fleet durable registration.** A confirmed GitHub intent precedes each
+   child-create attempt and publication. Uncertain creates require exact-marker
+   reconciliation; no timeout authorizes another create. Retries retain the
+   frozen workflow and wire bytes. The explicit `--exclusive-writer` flag asserts
+   an externally enforced deployment condition; it is not a distributed lock.
+   First-epic creation and an acquired exclusive writer remain separate gates.
 
 ## Project Overview
 
@@ -123,6 +142,9 @@ replace the HTTP polling loop in `_monitor_completion`. Not yet implemented._
 - `telemachy/rate_limiter.py` — Async token-bucket rate limiter for throttling outbound HTTP calls (#160)
 - `telemachy/executor.py` — Orchestrates the full workflow lifecycle: provision → assign tasks → monitor → teardown
 - `telemachy/cli.py` — Typer CLI (`run`, `plan`, `status`, `validate`, `list`, `cancel`)
+- `telemachy/fleet_registration.py`, `fleet_github.py`, `fleet_publish.py` —
+  issue-backed Fleet registration, confirmed GitHub mutations, JetStream PubAck
+- `telemachy/workflow_input.py` — shared file validation/loading for CLI commands
 - `telemachy/config.py` — Settings loaded from environment / `.env`
 - `telemachy/telemetry.py` — Observability primitives (correlation IDs, structured logging, metrics, tracing)
 - `docs/ROADMAP.md` — canonical roadmap for outstanding work (NATS
@@ -278,6 +300,8 @@ just lint                          # ruff check
 just format                        # ruff format
 just bandit                        # SAST scan (medium+ severity) on src/telemachy
 just check                         # lint + mypy + bandit + test
+just fleet-register reviewed.yaml --repo OWNER/REPO --epic-issue 42 \
+  --registration-key reviewed-idea --dry-run  # offline Fleet registration preview
 ```
 
 ## Workflow State Persistence
@@ -317,7 +341,9 @@ path that covers permissions, runner labels, and secrets references.
 | `AGAMEMNON_API_KEY` | `` | API key (if auth enabled) |
 | `AGAMEMNON_RATE_LIMIT_RPS` | `0` | Token-bucket refill rate (requests/sec) for outbound Agamemnon calls. `0` disables throttling. |
 | `AGAMEMNON_RATE_LIMIT_BURST` | `16` | Maximum burst size for the token bucket. Must be `>= 1`; `0` or negative is rejected at startup. |
-| `NATS_URL` | `nats://localhost:4222` | NATS server URL. Forwarded to `AgamemnonClient` and validated against `tls://` scheme when `REQUIRE_TLS=true`. **Not yet used to subscribe to events** — reserved for the planned NATS subscriber (#92). |
+| `NATS_URL` | `nats://localhost:4222` | Broker URL for explicit Fleet registration and legacy registration; also validated by `AgamemnonClient` when `REQUIRE_TLS=true`. Task-completion subscription remains planned (#92). |
+| `NATS_CLIENT_TOKEN` | (unset) | Optional backend token for the registration publisher; never persisted in issue metadata. |
+| `GITHUB_TOKEN` | (unset) | Backend GitHub authorization for explicit Fleet registration; required for mutations and unused by offline preview. |
 | `WORKFLOWS_DIR` | `workflows` | Directory to search for workflow YAML files |
 | `HOST_ID` | `hermes` | Host identifier embedded in Agamemnon task assignments |
 | `REQUIRE_TLS` | `true` | Reject non-TLS Agamemnon connections. Set to `false` to allow cleartext for local dev (logs a WARNING). |

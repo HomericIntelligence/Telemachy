@@ -162,3 +162,35 @@ async def test_expiring_stream_is_rejected_before_publication(private_broker: st
         assert (await js.stream_info("homeric-pipeline")).state.messages == 0
     finally:
         await nc.close()
+
+
+@pytest.mark.parametrize("discard_new_per_subject", [False, True])
+async def test_subject_limit_never_evicts_prior_registration(
+    private_broker: str, discard_new_per_subject: bool
+) -> None:
+    await configure(private_broker)
+    nc = await nats.connect(private_broker, allow_reconnect=False)
+    subject = "hi.pipeline.epic.a-b-c-99.registered"
+    first = b'{"retained":"registration from a-b/c"}'
+    try:
+        js = nc.jetstream()
+        info = await js.stream_info("homeric-pipeline")
+        info.config.max_msgs_per_subject = 1
+        info.config.discard_new_per_subject = discard_new_per_subject
+        await js.update_stream(config=info.config)
+        retained = await js.publish(subject, first)
+        payload = {
+            "schema": "hi/v1",
+            "msg_id": "distinct-registration",
+            "epic": {"repo": "a/b-c", "issue": 99, "key": "a-b-c-99"},
+        }
+        if discard_new_per_subject:
+            with pytest.raises(nats.js.errors.APIError):
+                await publish_registration(subject, payload, private_broker, allow_insecure=True)
+        else:
+            with pytest.raises(RuntimeError, match="incompatible_durable_pipeline_stream"):
+                await publish_registration(subject, payload, private_broker, allow_insecure=True)
+        assert (await js.get_msg("homeric-pipeline", seq=retained.seq)).data == first
+        assert (await js.stream_info("homeric-pipeline")).state.messages == 1
+    finally:
+        await nc.close()
