@@ -13,6 +13,11 @@ See `docs/backwards-compat.md`.
 
 ### Added
 
+- Explicit `register-fleet-epic` API/CLI for a reviewed existing epic, with
+  issue-backed child creation intents, frozen workflow identity, and a
+  JetStream-acknowledged publication outbox. See `docs/fleet-registration.md`
+  for the required single-writer deployment and unresolved first-epic intake gate
+  (Refs #338).
 - Release workflow (`.github/workflows/release.yml`) that builds
   sdist+wheel on `v*.*.*` tag pushes, cross-checks the tag against
   `pyproject.toml` and `__init__.py`, attaches artifacts to a GitHub

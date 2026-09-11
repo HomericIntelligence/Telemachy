@@ -21,6 +21,7 @@ from rich.table import Table
 from telemachy.agamemnon_client import AgamemnonClient
 from telemachy.config import settings
 from telemachy.executor import WorkflowExecutor, run_workflow
+from telemachy.fleet_cli import register_fleet_epic_cmd
 from telemachy.models import WorkflowSpec
 
 app = typer.Typer(
@@ -30,6 +31,7 @@ app = typer.Typer(
 )
 console = Console()
 err_console = Console(stderr=True)
+app.command(name="register-fleet-epic")(register_fleet_epic_cmd)
 
 logger = logging.getLogger(__name__)
 
