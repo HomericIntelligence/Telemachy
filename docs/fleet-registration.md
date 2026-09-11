@@ -139,7 +139,7 @@ exact producer body. Broker storage and process output are private; no live
 GitHub requests, worker execution, or production configuration are involved.
 This explicit command does not add another repository's binary to default pytest.
 
-The Ubuntu CI image provisions nats-server 2.10.24 from its official Linux amd64
+The Linux CI image provisions nats-server 2.10.24 from its official Linux amd64
 release and verifies the pinned SHA-256 before extraction. The existing CI test
 job builds that image before running the complete suite; broker tests remain
 mandatory. This is a development image dependency, not a Telemachy application
