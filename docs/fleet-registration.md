@@ -117,3 +117,24 @@ CLI gating, real private JetStream PubAck and duplicate receipts, receipt-write
 loss, and incompatible/missing stream rejection. GitHub authority in these
 tests is controlled; live GitHub admission and the full research-to-work flow
 remain unproven.
+
+## Native receiver contract
+
+Build Agamemnon's fixture-only target with `just fleet-epic-import-build` in its
+standalone checkout. From this checkout, invoke the explicit cross-repo harness:
+
+```bash
+just fleet-native-contract /path/to/Agamemnon/build/fleet/fleet_epic_import \
+  /path/to/nats-server /private/new-output-directory /path/to/python
+```
+
+The output directory must not already exist. The harness calls actual Fleet
+registration and publication against a fresh private broker and controlled GitHub
+issues. It checks identical durable-outbox/broker/native-handler bytes, a failed
+producer receipt write and duplicate PubAck retry without new children, native
+write-before-dispatch/ACK, restart replay, and a canonical parent wakeup. An
+altered capture must fail before admission. The native replay changes only its
+transport deduplication header to test receiver idempotence while retaining the
+exact producer body. Broker storage and process output are private; no live
+GitHub requests, worker execution, or production configuration are involved.
+This explicit command does not add another repository's binary to default pytest.

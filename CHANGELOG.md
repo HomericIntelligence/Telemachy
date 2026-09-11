@@ -13,6 +13,9 @@ See `docs/backwards-compat.md`.
 
 ### Added
 
+- Add an explicit actual-producer-to-native-consumer contract with private
+  JetStream and controlled GitHub failure/replay checks (Refs #338).
+
 - Explicit `register-fleet-epic` API/CLI for a reviewed existing epic, with
   issue-backed child creation intents, frozen workflow identity, and a
   JetStream-acknowledged publication outbox. See `docs/fleet-registration.md`

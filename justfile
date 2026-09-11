@@ -83,3 +83,7 @@ fleet-register *args:
 bootstrap:
     pixi install
     pixi run pre-commit install
+
+# Cross-repository proof using existing binaries; never contacts live GitHub.
+fleet-native-contract native broker output python='python3':
+    PYTHONPATH="src:.${PYTHONPATH:+:$PYTHONPATH}" {{python}} tests/contracts/native_consumer.py '{{native}}' '{{broker}}' '{{output}}'
