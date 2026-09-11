@@ -13,6 +13,9 @@ See `docs/backwards-compat.md`.
 
 ### Added
 
+- Provision the pinned, checksum-verified JetStream test broker in the existing
+  Ubuntu CI image so private-broker tests can run on clean CI hosts (Refs #338).
+
 - Add an explicit actual-producer-to-native-consumer contract with private
   JetStream and controlled GitHub failure/replay checks (Refs #338).
 
