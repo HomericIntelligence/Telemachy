@@ -31,7 +31,7 @@ sending a PR that alters planned scope.
 
 - [Git](https://git-scm.com/)
 - [GitHub CLI](https://cli.github.com/) (`gh`)
-- [Pixi](https://pixi.sh/) for environment management (installs Python 3.10+)
+- [Pixi](https://pixi.sh/) for environment management (installs Python 3.13)
 - [Just](https://just.systems/) as the command runner
 
 ### Environment Setup
@@ -151,6 +151,15 @@ Closes #10"
 just test
 ```
 
+### Reproduce the required CI gates
+
+Run `just ci-build`, then `just ci-all` for the bounded Linux container suite.
+The local runner and hosted jobs use the same check implementations, including
+Markdown, dependency audits, packaging, installed-wheel checks, and release
+validation. The release check does not publish anything. See
+[the CI runbook](docs/ci/local-ci.md) for tool pins, individual subsets, and
+environment storage.
+
 ### Lint and Format
 
 ```bash
@@ -179,7 +188,7 @@ just validate <WORKFLOW>
 
 ### Python Conventions
 
-- **Python version**: 3.10+ (managed by pixi)
+- **Python version**: 3.13 (managed by Pixi; versions below 3.14)
 - **Project layout**: src layout (`src/telemachy/`)
 - **Build backend**: hatchling (`pyproject.toml`)
 - **Type hints**: Required for all function parameters and return types

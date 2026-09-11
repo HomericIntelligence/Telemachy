@@ -99,6 +99,10 @@ See `docs/backwards-compat.md`.
 
 ### Fixed
 
+- Make local and hosted CI propagate missing-tool and failed-check results;
+  provision pinned native Linux tools and include every required check in
+  `just ci-all`, while preserving the host's `.pixi` environment (Refs #339).
+
 - Client: kwargs typing tightened for `AgamemnonClient` construction so
   mypy catches mismatches (#236).
 - Executor: `backlog` removed from `_DONE_STATUSES` — it is an initial

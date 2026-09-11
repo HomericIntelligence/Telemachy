@@ -126,9 +126,9 @@ def test_required_gitleaks_scan_fails_on_detected_secrets() -> None:
     workflow = _load_workflow(REQUIRED_WORKFLOW)
     scan = _step(_job(workflow, "security-secrets-scan"), "Run Gitleaks")["run"]
 
-    assert "--report-format sarif" in scan
-    assert "--report-path gitleaks.sarif" in scan
-    assert "--exit-code 0" not in scan
+    # The canonical runner's external invocation and failure behavior are
+    # exercised by test_ci_runner; this binds the required context to it.
+    assert scan.strip() == "bash scripts/run_ci_local.sh security-secrets-scan"
 
 
 def test_required_gitleaks_sarif_upload_runs_after_scan_failure() -> None:
