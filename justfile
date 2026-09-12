@@ -74,9 +74,19 @@ bootstrap:
 
 # === Containerized CI (podman by default) ===
 
-# Build the CI container image (podman first, docker fallback)
+# Build the CI image with one selected engine; failed builds remain failures.
 ci-build:
-    podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local . || docker build -f ci/Containerfile -t telemachy-ci:local .
+    #!/usr/bin/env bash
+    set -euo pipefail
+    engine="${CONTAINER_ENGINE:-}"
+    if [ -z "$engine" ]; then
+        if command -v podman >/dev/null; then engine=podman; else engine=docker; fi
+    fi
+    if [ "$(basename "$engine")" = podman ]; then
+        "$engine" build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
+    else
+        "$engine" build -f ci/Containerfile -t telemachy-ci:local .
+    fi
 
 # Run CI lint checks in container
 ci-lint:
@@ -125,3 +135,27 @@ ci-symlink-check:
 # Run all CI checks in container
 ci-all:
     ./scripts/run_ci_local.sh all
+
+# Audit every external Python dependency and the locked Markdown tool closure.
+ci-security-dependency-scan:
+    ./scripts/run_ci_local.sh security-dependency-scan
+
+ci-security-sast-scan:
+    ./scripts/run_ci_local.sh security-sast-scan
+
+# Package subsets consume the dist artifacts produced by ci-package-build.
+ci-package-build:
+    ./scripts/run_ci_local.sh build
+
+ci-package:
+    ./scripts/run_ci_local.sh package
+
+ci-install:
+    ./scripts/run_ci_local.sh install
+
+ci-release:
+    ./scripts/run_ci_local.sh release
+
+# Fixture checks execute copied scripts with fake external tools; no engine.
+ci-runner-test:
+    pixi run --locked pytest tests/test_ci_runner.py --no-cov -q

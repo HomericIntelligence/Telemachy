@@ -31,7 +31,7 @@ sending a PR that alters planned scope.
 
 - [Git](https://git-scm.com/)
 - [GitHub CLI](https://cli.github.com/) (`gh`)
-- [Pixi](https://pixi.sh/) for environment management (installs Python 3.10+)
+- [Pixi](https://pixi.sh/) for environment management (installs Python 3.13)
 - [Just](https://just.systems/) as the command runner
 
 ### Environment Setup
@@ -151,6 +151,15 @@ Closes #10"
 just test
 ```
 
+### Reproduce the required CI gates
+
+Run `just ci-build`, then `just ci-all` for the bounded Linux container suite.
+The local runner and hosted jobs use the same check implementations, including
+Markdown, dependency audits, packaging, installed-wheel checks, and release
+validation. The release check does not publish anything. See
+[the CI runbook](docs/ci/local-ci.md) for tool pins, individual subsets, and
+environment storage.
+
 ### Lint and Format
 
 ```bash
@@ -179,7 +188,7 @@ just validate <WORKFLOW>
 
 ### Python Conventions
 
-- **Python version**: 3.10+ (managed by pixi)
+- **Python version**: 3.13 (managed by Pixi; versions below 3.14)
 - **Project layout**: src layout (`src/telemachy/`)
 - **Build backend**: hatchling (`pyproject.toml`)
 - **Type hints**: Required for all function parameters and return types
@@ -207,14 +216,15 @@ gh pr create --title "[Type] Brief description" --body "Closes #<issue-number>"
 - PR title should be clear and descriptive
 - Tests and linting must pass
 
-### Merge queue rollout
+### Merge queue verification
 
-Telemachy's required checks support GitHub merge groups, but queue activation
-is a separate, staged operator action. See
-[`docs/ci/merge-queue.md`](docs/ci/merge-queue.md) for the approved queue
-policy, activation gate, smoke check, and rollback procedure. Until activation
-is recorded in issue #308, contributors must not assume that enabling
-auto-merge has placed a pull request in the queue.
+Telemachy's `main` branch uses an active merge queue. Complete independent review
+and current-head CI before normal queue admission. See
+[`docs/ci/merge-queue.md`](docs/ci/merge-queue.md) to compare live protection with
+the recorded policy and verify all 13 required checks on the actual queue head.
+Confirm the queue entry rather than assuming that enabling auto-merge created
+one. Missing checks require investigation and repair; do not weaken protection
+or use an admin bypass.
 
 ### Changelog discipline
 

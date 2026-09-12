@@ -1,0 +1,7 @@
+# Preserve the existing .markdownlintignore exclusions with CLI2's native config.
+ignores:
+  - .claude-prompt-*.md
+  - .claude-followup-*.md
+  - .pixi/**
+  - .ci-pixi/**
+  - ci/node_modules/**
