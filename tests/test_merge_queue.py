@@ -24,6 +24,7 @@ EXPECTED_REQUIRED_CONTEXTS = [
     "release",
     "schema-validation",
     "security/dependency-scan",
+    "security/sast-scan",
     "security/secrets-scan",
     "test",
     "unit-tests",
@@ -33,8 +34,8 @@ EXPECTED_MERGE_QUEUE_RULE = {
     "type": "merge_queue",
     "parameters": {
         "check_response_timeout_minutes": 60,
-        "grouping_strategy": "ALLGREEN",
-        "max_entries_to_build": 10,
+        "grouping_strategy": "HEADGREEN",
+        "max_entries_to_build": 2,
         "max_entries_to_merge": 5,
         "merge_method": "SQUASH",
         "min_entries_to_merge": 1,
@@ -92,9 +93,38 @@ def test_required_workflow_pull_request_main_block_is_exact() -> None:
     assert on_block["pull_request"] == {"branches": ["main"]}
 
 
-def test_required_workflow_no_longer_runs_on_merge_group() -> None:
+def test_required_workflow_accepts_queue_checks_without_path_filters() -> None:
     on_block = _on_block(_load_workflow(REQUIRED_WORKFLOW))
-    assert "merge_group" not in on_block
+    assert on_block.get("merge_group") == {"types": ["checks_requested"]}
+
+
+def test_queue_required_jobs_and_dependencies_have_no_event_exclusions() -> None:
+    """Bind queue output names to real jobs, including aggregate dependencies.
+
+    This checks the supported unconditional configuration, not a simulation of
+    the Actions scheduler. A real merge-group run must still pass these checks.
+    """
+    jobs = _load_workflow(REQUIRED_WORKFLOW)["jobs"]
+    pending = []
+    for context in EXPECTED_REQUIRED_CONTEXTS:
+        matching = [job_id for job_id, job in jobs.items() if job.get("name", job_id) == context]
+        assert len(matching) == 1, (context, matching)
+        pending.extend(matching)
+    visited = set()
+    while pending:
+        job_id = pending.pop()
+        if job_id in visited:
+            continue
+        visited.add(job_id)
+        job = jobs[job_id]
+        assert "if" not in job, (job_id, "required job must run for queue events")
+        assert not job.get("continue-on-error"), job_id
+        assert any(
+            "run" in step and "if" not in step and not step.get("continue-on-error")
+            for step in job["steps"]
+        ), job_id
+        needs = job.get("needs", [])
+        pending.extend([needs] if isinstance(needs, str) else needs)
 
 
 def test_smoke_workflow_handles_merge_group_checks_requested_only() -> None:
@@ -126,9 +156,9 @@ def test_required_gitleaks_scan_fails_on_detected_secrets() -> None:
     workflow = _load_workflow(REQUIRED_WORKFLOW)
     scan = _step(_job(workflow, "security-secrets-scan"), "Run Gitleaks")["run"]
 
-    assert "--report-format sarif" in scan
-    assert "--report-path gitleaks.sarif" in scan
-    assert "--exit-code 0" not in scan
+    # The canonical runner's external invocation and failure behavior are
+    # exercised by test_ci_runner; this binds the required context to it.
+    assert scan.strip() == "bash scripts/run_ci_local.sh security-secrets-scan"
 
 
 def test_required_gitleaks_sarif_upload_runs_after_scan_failure() -> None:

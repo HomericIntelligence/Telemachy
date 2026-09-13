@@ -1,6 +1,6 @@
 # Minimal ignorefile for the CI image build context.
-# NOTE: pixi.toml / pixi.lock / pyproject.toml / uv.lock must NOT be ignored —
-# the CI image bakes the locked environment from them.
+# CI tool manifests remain in the context; project dependencies are installed
+# from the mounted source's lock file when a check needs them.
 .git
 .gitignore
 .github
@@ -9,3 +9,5 @@ docs
 node_modules
 .venv
 .pixi
+.ci-pixi
+ci/node_modules

@@ -13,6 +13,11 @@ build/
 .venv/
 venv/
 .pixi/
+.ci-pixi/
+ci/node_modules/
+bandit.json
+gitleaks.sarif
+telemachy-schema.json
 
 # Environment / secrets
 .env

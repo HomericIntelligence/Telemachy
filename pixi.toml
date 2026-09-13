@@ -3,7 +3,7 @@ name = "project-telemachy"
 version = "0.2.0"
 description = "Declarative workflow engine for ProjectAgamemnon multi-agent workflows"
 channels = ["conda-forge"]
-platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "osx-64", "win-64"]
 
 [dependencies]
 python = ">=3.13,<3.14"
@@ -33,6 +33,10 @@ bandit          = "bandit -ll --ini .bandit -r src/telemachy"
 license-audit   = "python -c \"import tomllib, pathlib; data = tomllib.loads(pathlib.Path('pixi.toml').read_text()); deps = data.get('pypi-dependencies', {}); print('Runtime [pypi-dependencies] (cross-check against docs/license-audit.md):'); [print(f'  {k} = {v!r}') for k, v in deps.items() if k != 'telemachy']\""
 
 [feature.dev.pypi-dependencies]
+pip-audit = "==2.10.1"
+build = "==1.6.1"
+hatchling = "==1.32.0"
+twine = "==7.0.0"
 pytest          = ">=8.0"
 pytest-asyncio  = ">=0.23"
 pytest-cov      = ">=5.0"
