@@ -364,6 +364,23 @@ path that covers permissions, runner labels, and secrets references.
 | `OTEL_SERVICE_NAME` | `telemachy` | Service name for OpenTelemetry resource |
 | `OTEL_EXPORTER` | `console` | OTel exporter type (only `console` supported in this release; OTLP is a planned follow-up) |
 
+## Design Philosophy
+
+The architecture above follows design principles inherited from
+**ProjectOdyssey**:
+
+- **Declared contracts are implemented (no scaffold-only).** Every subject,
+  workflow step, and state transition in this repository must have a working
+  implementation; a documented-but-unwired integration (see the NATS/S3 audit
+  item) is treated as a defect, not a roadmap placeholder.
+- **Typed state persistence (DRY).** Workflow state, schemas, and transition
+  rules are declared in exactly one place and consumed by both the runtime and
+  the tests, so they cannot drift apart.
+- **Observability by construction (KISS).** Every state change is an event on a
+  documented subject — debugging is replaying the log, not guessing.
+- **Least privilege (POLA).** S3 and NATS credentials are scoped to the minimal
+  bucket/stream permissions each workflow step requires.
+
 ## See also
 
 - `CONTRIBUTING.md` — contribution workflow.
