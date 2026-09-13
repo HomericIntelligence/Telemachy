@@ -1,102 +1,80 @@
-# Merge queue rollout
+# Merge queue verification
 
-Telemachy's `main` branch is prepared for a staged GitHub merge-queue rollout.
-An independent human must review the workflow changes before the readiness pull
-request may merge; following this runbook does not satisfy that review gate. The
-queue must not be activated until the readiness pull request has merged, strict
-review findings are resolved, and a representative smoke-check pull request is
-ready.
+Telemachy's `main` branch already uses a merge queue. Its live repository rules
+remain authoritative. This runbook verifies the current policy and actual queue
+checks; it does not activate the queue or write branch protection.
 
-The repository-level `homeric-main-baseline` ruleset remains the source of truth
-for branch protection. Activation must append one `merge_queue` rule to that
-ruleset without changing its conditions, bypass actors, enforcement mode, or
-existing rules.
+PR #312 removed the full workflow's queue trigger in anticipation of a later
+smoke-only protection policy. That policy change was not applied. Restoring the
+real required checks preserves the current protection. The separate
+`merge-queue-smoke` workflow is advisory and cannot satisfy the required suite.
 
-## Required checks
+## Current policy and check mapping
 
 [`configs/github/merge-queue-policy.json`](../../configs/github/merge-queue-policy.json)
-is the machine-readable source of truth for the required contexts and approved
-queue rule. Inspect the exact context list with:
+records the 13 required contexts and queue settings observed on 2026-09-12.
+Re-read live protection before each acceptance run; stop on any mismatch.
 
-```bash
-jq -r '.required_contexts[]' configs/github/merge-queue-policy.json
-```
+| Required context | Job in `_required.yml` | Gate |
+| --- | --- | --- |
+| `build` | `build` | Build the Python distributions |
+| `deps/version-sync` | `deps-version-sync` | Verify all version declarations |
+| `install` | `install` | Install the wheel in an isolated environment |
+| `integration-tests` | `integration-tests` | Run integration tests |
+| `lint` | `lint` | Run language and configuration lint |
+| `package` | `package` | Validate distribution metadata |
+| `release` | `release` | Check version and changelog; no publication |
+| `schema-validation` | `schema-validation` | Validate configuration syntax |
+| `security/dependency-scan` | `security-dependency-scan` | Audit provisioned dependencies |
+| `security/sast-scan` | `security-sast-scan` | Run the configured Bandit policy |
+| `security/secrets-scan` | `security-secrets-scan` | Run blocking, redacted Gitleaks |
+| `test` | `test` | Require both unit and integration jobs |
+| `unit-tests` | `unit-tests` | Run unit tests and coverage |
 
-`.github/workflows/_required.yml` emits these contexts for `push`,
-`pull_request`, and `merge_group` `checks_requested` events. The tag-only
-`.github/workflows/release.yml` publisher must remain tag-only; it must never run
-for merge groups.
+The required workflow handles `push` to main, pull requests to main, and
+`merge_group` `checks_requested`. Every context runs its real gate on the queue
+commit. The tag-only `.github/workflows/release.yml` publisher remains separate.
+The shared implementations and local equivalents are described in
+[local CI](local-ci.md).
 
-## Approved policy
+The live queue uses squash and `HEADGREEN`, with at most two entries building
+concurrently and up to five entries merging together. It can form a group with
+one entry after five minutes; required checks have 60 minutes to report.
+`HEADGREEN` evaluates the group head's required checks. This does not reduce or
+replace the 13 required contexts. Each CI container defaults to two CPUs, 4 GiB
+of memory and 512 processes; workflow jobs retain their bounded timeouts.
 
-The rule appended during activation must match the artifact's
-`merge_queue_rule` object exactly:
+## Verify a designated queued change
 
-```bash
-jq '.merge_queue_rule' configs/github/merge-queue-policy.json
-```
-
-This means at most 10 queue entries may request builds concurrently, at most 5
-entries may merge as a group, and a group may proceed with one entry after the
-5-minute wait. Required checks have 60 minutes to report. `ALLGREEN` requires
-every pull request represented in the group to satisfy the required checks.
-
-## Post-merge activation
-
-Activation is an operator step, not part of the readiness pull request.
-
-1. Confirm the readiness change is on `main` and its required checks are green.
-2. Confirm a representative pull request is ready to enter the queue.
-3. Re-read the live ruleset and save a restorable payload.
-4. Append only the approved `merge_queue` rule and update the full ruleset.
-5. Re-read the ruleset, then queue the smoke pull request with squash.
-6. Confirm a `merge_group` run emits and passes all required contexts before the
-   pull request merges.
-7. Record the ruleset response, workflow run, and queued merge in issue #308.
-
-The following commands preserve the full live ruleset and refuse to append a
-second queue rule. Review both generated JSON files before running the `PUT`.
+1. Complete independent review and actual local and hosted CI for the exact
+   pull-request head before normal queue admission. Do not use an admin bypass.
+2. Capture the live rules and compare them with the checked-in snapshot below.
+3. Let the authorized coordinator admit the designated pull request through the
+   normal expected-head queue path. The commands below observe an existing
+   entry; they do not enqueue or merge it.
+4. Bind the selected run to that entry's enqueue time and queue-head SHA. Wait
+   for all 13 actual contexts, not only the fast advisory smoke job.
+5. Preserve the raw rules, queue entry, workflow run and job/check responses.
+   Record failure or non-completion honestly; a configuration test cannot prove
+   that GitHub scheduled or passed a real queue run.
 
 ```bash
 REPO=HomericIntelligence/Telemachy
 POLICY=configs/github/merge-queue-policy.json
-RULESET_NAME=homeric-main-baseline
-RULESET_ID="$(gh api "repos/${REPO}/rulesets" \
-  --jq ".[] | select(.name == \"${RULESET_NAME}\") | .id")"
-test -n "${RULESET_ID}"
-
-gh api "repos/${REPO}/rulesets/${RULESET_ID}" \
-  | jq '{name, target, enforcement, bypass_actors, conditions, rules}' \
-  > /tmp/telemachy-ruleset-before.json
-
-jq -e '[.rules[] | select(.type == "merge_queue")] | length == 0' \
-  /tmp/telemachy-ruleset-before.json
+RULES_JSON="$(mktemp)"
+gh api "repos/${REPO}/rules/branches/main" > "${RULES_JSON}"
 
 jq --slurpfile policy "${POLICY}" -e '
-  ([.rules[] | select(.type == "required_status_checks")
+  ([.[] | select(.type == "required_status_checks")
     | .parameters.required_status_checks[].context] | sort)
   == ($policy[0].required_contexts | sort)
-' /tmp/telemachy-ruleset-before.json
+  and
+  ([.[] | select(.type == "merge_queue") | {type, parameters}]
+    == [$policy[0].merge_queue_rule])
+' "${RULES_JSON}"
+# Keep RULES_JSON with the acceptance evidence; no policy mutation is performed.
 
-jq --slurpfile policy "${POLICY}" \
-  '.rules += [$policy[0].merge_queue_rule]' \
-  /tmp/telemachy-ruleset-before.json \
-  > /tmp/telemachy-ruleset-with-queue.json
-
-gh api --method PUT "repos/${REPO}/rulesets/${RULESET_ID}" \
-  --input /tmp/telemachy-ruleset-with-queue.json
-```
-
-After the update, verify the live policy and run the smoke check:
-
-```bash
-gh api "repos/${REPO}/rulesets/${RULESET_ID}" \
-  | jq --slurpfile policy "${POLICY}" -e '
-      [.rules[] | select(.type == "merge_queue")]
-      == [$policy[0].merge_queue_rule]
-    '
-
-SMOKE_PR=123  # Replace with the designated smoke pull request number.
+SMOKE_PR=123  # Replace with the designated, already queued pull request.
 OWNER="${REPO%%/*}"
 NAME="${REPO#*/}"
 REQUESTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -105,8 +83,6 @@ PR_HEAD_SHA="$(gh pr view "${SMOKE_PR}" --repo "${REPO}" \
 test -n "${PR_HEAD_SHA}"
 printf 'smoke_pr=%s requested_at=%s pr_head_sha=%s\n' \
   "${SMOKE_PR}" "${REQUESTED_AT}" "${PR_HEAD_SHA}"
-
-gh pr merge --auto --squash "${SMOKE_PR}" --repo "${REPO}"
 
 # Poll the designated PR until GitHub records its actual queue entry. The entry
 # provides both the authoritative enqueue time and that entry's queue head SHA.
@@ -234,23 +210,19 @@ jq -e --arg queue_head_sha "${QUEUE_HEAD_SHA}" '
 The selected run is tied to the designated smoke pull request through its merge
 queue entry, actual enqueue time, and exact queue head SHA. The job query then
 follows that run's `check_run_url` values. Both the required job names and their
-check-run names must equal the 12-context artifact exactly, without missing or
+check-run names must equal the 13-context artifact exactly, without missing or
 duplicate required contexts, and every required job and check run must finish
 successfully. Additional advisory jobs may run but are not policy contexts.
 
-Do not remove or rename any required context during activation. The queue rule
+Do not remove or rename any required context to make a queued change pass. The queue rule
 does not carry a separate check list; it relies on the existing
 `required_status_checks` rule in the same ruleset.
 
-## Rollback
+## A queued check is missing or fails
 
-If the rule update does not preserve the ruleset or the smoke check cannot emit
-all required contexts, stop the rollout and restore the reviewed snapshot:
-
-```bash
-gh api --method PUT "repos/${REPO}/rulesets/${RULESET_ID}" \
-  --input /tmp/telemachy-ruleset-before.json
-```
-
-Re-read the ruleset after rollback and confirm the `merge_queue` rule is absent
-while all pre-existing required contexts and protection rules remain intact.
+Stop acceptance and inspect the exact queue-head run and live rules. A source
+repair can require a fresh queue entry after review and CI, which the authorized
+coordinator manages separately. Preserve the failed entry and run evidence.
+Do not rewrite check results, remove a required context, or use the historical
+smoke-only policy proposal as a workaround. Any later protection change requires
+its own explicit review and authorization.

@@ -216,14 +216,15 @@ gh pr create --title "[Type] Brief description" --body "Closes #<issue-number>"
 - PR title should be clear and descriptive
 - Tests and linting must pass
 
-### Merge queue rollout
+### Merge queue verification
 
-Telemachy's required checks support GitHub merge groups, but queue activation
-is a separate, staged operator action. See
-[`docs/ci/merge-queue.md`](docs/ci/merge-queue.md) for the approved queue
-policy, activation gate, smoke check, and rollback procedure. Until activation
-is recorded in issue #308, contributors must not assume that enabling
-auto-merge has placed a pull request in the queue.
+Telemachy's `main` branch uses an active merge queue. Complete independent review
+and current-head CI before normal queue admission. See
+[`docs/ci/merge-queue.md`](docs/ci/merge-queue.md) to compare live protection with
+the recorded policy and verify all 13 required checks on the actual queue head.
+Confirm the queue entry rather than assuming that enabling auto-merge created
+one. Missing checks require investigation and repair; do not weaken protection
+or use an admin bypass.
 
 ### Changelog discipline
 

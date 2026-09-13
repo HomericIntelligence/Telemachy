@@ -99,6 +99,8 @@ See `docs/backwards-compat.md`.
 
 ### Fixed
 
+- Restore real merge-group required checks after #312, preserving all 13 live
+  contexts and documenting the existing `HEADGREEN` queue policy (#340).
 - Make local and hosted CI propagate missing-tool and failed-check results;
   provision pinned native Linux tools and include every required check in
   `just ci-all`, while preserving the host's `.pixi` environment (Refs #339).
