@@ -113,6 +113,11 @@ teardown: on_completion   # on_completion | on_failure | never
 
 ## Idempotency
 
+For the explicit Fleet issue-registration path, see
+[Durable Fleet epic registration](docs/fleet-registration.md). It uses an
+existing reviewed epic, issue-backed creation intents, and JetStream PubAck;
+its retry contract is separate from workflow resource provisioning below.
+
 Telemachy tags every agent and team it creates with a `tlm-<workflow>-<resource>` key stored in
 Agamemnon. When a workflow is re-run (e.g. after a partial failure), resources whose keys already
 exist in Agamemnon are reused rather than re-created, making retries safe by default.

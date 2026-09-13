@@ -67,10 +67,26 @@ format:
 # Run the full local CI suite: lint, mypy, bandit, tests
 check: lint mypy bandit test
 
+# Focused checks in an explicitly provisioned environment; never runs a solver.
+fleet-registration-test python='python3':
+    {{python}} -m pytest tests/test_github_epic.py tests/test_fleet_registration.py tests/test_fleet_github.py tests/test_fleet_cli.py -q
+
+fleet-registration-integration python='python3' nats_server='nats-server':
+    TELEMACHY_TEST_NATS_SERVER='{{nats_server}}' {{python}} -m pytest tests/integration/test_fleet_registration_transport.py -q
+
+# Explicit durable registration; legacy register-epic remains unchanged.
+[positional-arguments]
+fleet-register *args:
+    pixi run python -m telemachy.cli register-fleet-epic "$@"
+
 # Install dev dependencies and set up pre-commit hooks
 bootstrap:
     pixi install
     pixi run pre-commit install
+
+# Cross-repository proof using existing binaries; never contacts live GitHub.
+fleet-native-contract native broker output python='python3':
+    PYTHONPATH="src:.${PYTHONPATH:+:$PYTHONPATH}" {{python}} tests/contracts/native_consumer.py '{{native}}' '{{broker}}' '{{output}}'
 
 # === Containerized CI (podman by default) ===
 

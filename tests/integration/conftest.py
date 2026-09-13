@@ -164,19 +164,39 @@ def _install_routes(router: respx.MockRouter, state: MockAgamemnonState) -> None
         return httpx.Response(200, json={"tasks": state.tasks.get(tid, [])})
 
     # Register routes with explicit `name=` so tests can do router["create_agent"].calls.
-    router.post("http://mock-agamemnon/v1/agents", name="create_agent").mock(side_effect=create_agent)
-    router.post("http://mock-agamemnon/v1/agents/docker", name="create_docker_agent").mock(side_effect=create_docker_agent)
-    router.post(url__regex=r"http://mock-agamemnon/v1/agents/[^/]+/start$", name="start_agent").mock(side_effect=start_agent)
-    router.post(url__regex=r"http://mock-agamemnon/v1/agents/[^/]+/stop$", name="stop_agent").mock(side_effect=stop_agent)
-    router.delete(url__regex=r"http://mock-agamemnon/v1/agents/[^/]+$", name="delete_agent").mock(side_effect=delete_agent)
+    router.post("http://mock-agamemnon/v1/agents", name="create_agent").mock(
+        side_effect=create_agent
+    )
+    router.post("http://mock-agamemnon/v1/agents/docker", name="create_docker_agent").mock(
+        side_effect=create_docker_agent
+    )
+    router.post(
+        url__regex=r"http://mock-agamemnon/v1/agents/[^/]+/start$", name="start_agent"
+    ).mock(side_effect=start_agent)
+    router.post(url__regex=r"http://mock-agamemnon/v1/agents/[^/]+/stop$", name="stop_agent").mock(
+        side_effect=stop_agent
+    )
+    router.delete(url__regex=r"http://mock-agamemnon/v1/agents/[^/]+$", name="delete_agent").mock(
+        side_effect=delete_agent
+    )
     router.get("http://mock-agamemnon/v1/agents", name="list_agents").mock(side_effect=list_agents)
     router.get("http://mock-agamemnon/v1/teams", name="list_teams").mock(side_effect=list_teams)
     router.post("http://mock-agamemnon/v1/teams", name="create_team").mock(side_effect=create_team)
-    router.put(url__regex=r"http://mock-agamemnon/v1/teams/[^/]+$", name="set_team_members").mock(side_effect=set_team_members)
-    router.delete(url__regex=r"http://mock-agamemnon/v1/teams/[^/]+$", name="delete_team").mock(side_effect=delete_team)
-    router.post(url__regex=r"http://mock-agamemnon/v1/teams/[^/]+/tasks$", name="create_task").mock(side_effect=create_task)
-    router.put(url__regex=r"http://mock-agamemnon/v1/teams/[^/]+/tasks/[^/]+$", name="update_task").mock(side_effect=update_task)
-    router.get(url__regex=r"http://mock-agamemnon/v1/teams/[^/]+/tasks$", name="list_tasks").mock(side_effect=list_tasks)
+    router.put(url__regex=r"http://mock-agamemnon/v1/teams/[^/]+$", name="set_team_members").mock(
+        side_effect=set_team_members
+    )
+    router.delete(url__regex=r"http://mock-agamemnon/v1/teams/[^/]+$", name="delete_team").mock(
+        side_effect=delete_team
+    )
+    router.post(url__regex=r"http://mock-agamemnon/v1/teams/[^/]+/tasks$", name="create_task").mock(
+        side_effect=create_task
+    )
+    router.put(
+        url__regex=r"http://mock-agamemnon/v1/teams/[^/]+/tasks/[^/]+$", name="update_task"
+    ).mock(side_effect=update_task)
+    router.get(url__regex=r"http://mock-agamemnon/v1/teams/[^/]+/tasks$", name="list_tasks").mock(
+        side_effect=list_tasks
+    )
 
 
 def make_spec(**overrides: Any) -> WorkflowSpec:
@@ -204,7 +224,9 @@ def payload_contains(actual: dict[str, Any], expected: dict[str, Any]) -> bool:
 
 
 @pytest_asyncio.fixture
-async def mock_agamemnon() -> AsyncIterator[tuple[MockAgamemnonState, respx.MockRouter, AgamemnonClient]]:
+async def mock_agamemnon() -> AsyncIterator[
+    tuple[MockAgamemnonState, respx.MockRouter, AgamemnonClient]
+]:
     """Stateful mock + entered AgamemnonClient, both alive for the test body."""
     state = MockAgamemnonState()
     with respx.mock(base_url="http://mock-agamemnon", assert_all_called=False) as router:

@@ -13,6 +13,21 @@ See `docs/backwards-compat.md`.
 
 ### Added
 
+- Provision the pinned, checksum-verified JetStream test broker in the existing
+  Linux CI image so private-broker tests can run on clean CI hosts (Refs #338).
+
+- Reject Fleet streams that can evict prior work through per-subject limits;
+  document the public Fleet handoff and share CLI workflow input without a
+  cyclic dependency (Refs #338).
+
+- Add an explicit actual-producer-to-native-consumer contract with private
+  JetStream and controlled GitHub failure/replay checks (Refs #338).
+
+- Explicit `register-fleet-epic` API/CLI for a reviewed existing epic, with
+  issue-backed child creation intents, frozen workflow identity, and a
+  JetStream-acknowledged publication outbox. See `docs/fleet-registration.md`
+  for the required single-writer deployment and unresolved first-epic intake gate
+  (Refs #338).
 - Release workflow (`.github/workflows/release.yml`) that builds
   sdist+wheel on `v*.*.*` tag pushes, cross-checks the tag against
   `pyproject.toml` and `__init__.py`, attaches artifacts to a GitHub
