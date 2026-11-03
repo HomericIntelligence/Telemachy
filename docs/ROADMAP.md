@@ -15,37 +15,39 @@ Conventions:
 
 | Work | Status | Issue | ADR |
 | --- | --- | --- | --- |
-| HTTP-polling task monitoring | Shipped (default) | — | [ADR-001](adr/001-http-polling-monitoring.md) |
+| HTTP-polling task monitoring | Superseded by event-driven monitoring | [#92](https://github.com/HomericIntelligence/Telemachy/issues/92) | [ADR-001](adr/001-http-polling-monitoring.md) |
+| NATS subscriber for task-lifecycle events | Shipped | [#92](https://github.com/HomericIntelligence/Telemachy/issues/92) | ADR-001 superseded |
+| Persistent state backend for `status`/`list`/`cancel` | Shipped | [#92](https://github.com/HomericIntelligence/Telemachy/issues/92) | — |
+| Durable Fleet epic registration | Shipped | [#339](https://github.com/HomericIntelligence/Telemachy/issues/339) | — |
 | Agamemnon-exclusive backend | Shipped | — | [ADR-002](adr/002-decouple-from-maestro.md) |
 | Secure TLS default (`REQUIRE_TLS=true`) | Shipped | [#158](https://github.com/HomericIntelligence/Telemachy/issues/158) | — |
 | Release workflow (PyPI + GH Release) | Shipped | [#153](https://github.com/HomericIntelligence/Telemachy/issues/153) | — |
 | 75% coverage gate | Shipped | [#152](https://github.com/HomericIntelligence/Telemachy/issues/152) | — |
-| Strict-audit remediation epic | In progress | [#92](https://github.com/HomericIntelligence/Telemachy/issues/92) | — |
 
 ## Next Release (v0.2.0)
 
 | Work | Status | Issue | ADR |
 | --- | --- | --- | --- |
-| NATS subscriber for task-lifecycle events (supersedes ADR-001) | Planned | [#92](https://github.com/HomericIntelligence/Telemachy/issues/92) | ADR-001 → to be superseded |
 | Roadmap & milestones (this artefact) | In progress | [#167](https://github.com/HomericIntelligence/Telemachy/issues/167) | [ADR-003](adr/003-roadmap-artifact.md) |
+| Retire the polling-era settings retained for compatibility | Planned | _no issue yet — file before starting work_ | — |
 
 ## Future (v1.0.0 and beyond)
 
 | Work | Status | Issue | ADR |
 | --- | --- | --- | --- |
-| Persistent workflow-state backend (enables `status`/`list`/`cancel`) | Design not started | _no issue yet — file before starting work_ | _ADR required at design time_ |
 | Stabilise workflow YAML to `apiVersion: telemachy/v1` (drop pre-1.0 caveats) | Pending v0.2.0 | _no issue yet_ | — |
+| First-epic automated creation for Fleet intake (currently an unresolved gate) | Design not started | [#339](https://github.com/HomericIntelligence/Telemachy/issues/339) | — |
 
 ## Known Limitations
 
-- `status`, `list`, and `cancel` CLI commands are not implemented; they
-  require the state backend listed in Future. Until then, query
-  ProjectAgamemnon directly. (`AGENTS.md` §Planned Features, `README.md`.)
-- Task-completion detection is HTTP polling, bounded by
-  `MONITOR_TIMEOUT_SECONDS` / `MONITOR_MAX_POLLS`. Event-driven
-  detection is gated on the NATS subscriber above.
-- `NATS_URL` is parsed and TLS-validated but **not yet subscribed to**;
-  it is reserved for the planned subscriber.
+- The `state backend` is local to one host: `status`/`list`/`cancel` read
+  `TELEMACHY_STATE_DIR` and do not query Agamemnon.
+- Task-completion detection requires a reachable NATS broker; the executor
+  fails closed (`NatsUnavailableError`) when the event bus is unavailable.
+- Fleet registration requires an externally enforced single writer; GitHub
+  issue PATCH is not an atomic compare-and-swap.
+- `MONITOR_MAX_POLLS` and the `HEALTHCHECK_*` settings no longer affect
+  behaviour; they are retained so existing environments keep parsing.
 
 ## How to propose a roadmap change
 

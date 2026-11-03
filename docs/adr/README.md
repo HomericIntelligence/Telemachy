@@ -16,7 +16,7 @@ significant architectural choice was made.
 
 | Number | Title | Status |
 | --- | --- | --- |
-| 001 | Monitoring via HTTP polling instead of NATS events | Proposed |
+| 001 | Monitoring via HTTP polling instead of NATS events | Superseded by event-driven monitoring |
 | 002 | Decouple from ai-maestro (use Agamemnon exclusively) | Accepted |
 | 003 | `docs/ROADMAP.md` as the canonical planning artefact | Accepted |
 | [004](004-pii-handling-stance.md) | PII handling stance for workflow text | Accepted |

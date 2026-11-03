@@ -9,7 +9,6 @@ requires-python = ">=3.13,<3.14"
 
 [project.scripts]
 telemachy = "telemachy.cli:main"
-telemachy-mcp = "telemachy.mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/telemachy"]

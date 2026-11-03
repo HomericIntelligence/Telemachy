@@ -6,9 +6,10 @@ tasks. Agamemnon owns the resulting orchestration graph and task decisions;
 Hephaestus owns implementation/review labels. This command never writes
 `state:*` labels or uses the local workflow state store.
 
-The legacy `register-epic` API and command remain available for their existing
-callers. They create a fresh epic and use Core NATS; they do not satisfy the
-Fleet durability contract. Fleet callers must select this explicit command or
+`register-fleet-epic` is the only epic-registration path. The earlier
+`register-epic` command, which created a fresh epic through the `gh` CLI and
+published over Core NATS, has been removed; it did not satisfy the Fleet
+durability contract. Callers use this command or
 `telemachy.fleet_registration.register_fleet_epic`.
 
 ## Operator contract

@@ -46,7 +46,7 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-lint`.
+      # use via `bash scripts/run_ci_local.sh lint`.
       - name: lint (in container)
         run: bash scripts/run_ci_local.sh lint
 
@@ -70,7 +70,7 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-markdownlint`.
+      # use via `bash scripts/run_ci_local.sh markdownlint`.
       - name: markdownlint (in container)
         run: bash scripts/run_ci_local.sh markdownlint
 
@@ -94,7 +94,7 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-pixi-check`.
+      # use via `bash scripts/run_ci_local.sh pixi-check`.
       - name: pixi-check (in container)
         run: bash scripts/run_ci_local.sh pixi-check
 
@@ -118,7 +118,7 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-justfile-check`.
+      # use via `bash scripts/run_ci_local.sh justfile-check`.
       - name: justfile-check (in container)
         run: bash scripts/run_ci_local.sh justfile-check
 
@@ -142,7 +142,7 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-symlink-check`.
+      # use via `bash scripts/run_ci_local.sh symlink-check`.
       - name: symlink-check (in container)
         run: bash scripts/run_ci_local.sh symlink-check
 
@@ -166,7 +166,7 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-unit-tests`.
+      # use via `bash scripts/run_ci_local.sh unit-tests`.
       - name: unit-tests (in container)
         run: bash scripts/run_ci_local.sh unit-tests
 
@@ -190,7 +190,7 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-integration-tests`.
+      # use via `bash scripts/run_ci_local.sh integration-tests`.
       - name: integration-tests (in container)
         run: bash scripts/run_ci_local.sh integration-tests
 
@@ -230,7 +230,7 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-security-dependency-scan`.
+      # use via `bash scripts/run_ci_local.sh security-dependency-scan`.
       - name: security-dependency-scan (in container)
         run: bash scripts/run_ci_local.sh security-dependency-scan
 
@@ -380,7 +380,7 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-schema-validation`.
+      # use via `bash scripts/run_ci_local.sh schema-validation`.
       - name: schema-validation (in container)
         run: bash scripts/run_ci_local.sh schema-validation
 
@@ -404,6 +404,6 @@ jobs:
       - name: Build CI image (podman)
         run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       # All checks run inside the CI container — the same image developers
-      # use via `just ci-deps-version-sync`.
+      # use via `bash scripts/run_ci_local.sh deps-version-sync`.
       - name: deps-version-sync (in container)
         run: bash scripts/run_ci_local.sh deps-version-sync

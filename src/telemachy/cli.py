@@ -392,46 +392,6 @@ def schema(
     typer.echo(f"Schema written to {output}")
 
 
-@app.command(name="register-epic")
-def register_epic_cmd(
-    workflow_path: Annotated[Path, typer.Argument(help="Path to workflow YAML file")],
-    repo: Annotated[
-        str | None,
-        typer.Option("--repo", help="Target GitHub repo OWNER/NAME (default: current repo)"),
-    ] = None,
-    dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="Plan only: create nothing, publish nothing")
-    ] = False,
-) -> None:
-    """Describe a workflow as a GitHub epic + child issues and publish the trigger.
-
-    Creates one child issue per task (label ``state:needs-plan``), an epic
-    issue with the parseable task-list body (label ``agamemnon-epic``), and
-    publishes ``hi.pipeline.epic.{key}.registered`` (Odysseus ADR-013 §6).
-    The final stdout line is a JSON result object — a machine contract for
-    callers (e.g. the Hephaestus research myrmidon).
-    """
-    import json as _json
-
-    from telemachy.github_epic import register_epic
-
-    _validate_workflow_path(workflow_path)
-    spec = _load_workflow(workflow_path)
-    try:
-        result = register_epic(spec, repo=repo, nats_url=settings.nats_url, dry_run=dry_run)
-    except Exception as exc:
-        err_console.print(f"[bold red]register-epic failed:[/bold red] {exc}")
-        raise typer.Exit(1) from exc
-    # Human-readable summary on stderr-adjacent rich console; JSON contract on
-    # plain stdout as the FINAL line.
-    if not dry_run:
-        console.print(
-            f"[bold green]Epic #{result['epic']} registered on {result['repo']}"
-            f"[/bold green] (key {result['key']}, {len(result['children'])} children)"
-        )
-    print(_json.dumps(result))
-
-
 def main() -> None:
     _setup_logging()
     app()

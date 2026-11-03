@@ -1,6 +1,6 @@
 # ADR-001: Monitor workflow completion via HTTP polling
 
-- **Status:** Proposed
+- **Status:** Superseded by event-driven NATS monitoring (#251, #3)
 - **Date:** 2026-05-16
 - **Deciders:** Telemachy maintainers
 - **Context tags:** monitoring, NATS, executor
@@ -60,6 +60,7 @@ Negative:
 
 ## References
 
-- `src/telemachy/executor.py` (poll loop)
+- `src/telemachy/executor.py` (event-driven monitor)
+- `src/telemachy/nats_monitor.py`
 - `src/telemachy/agamemnon_client.py`
 - Odysseus `docs/adr/005-nats-subject-schema.md`
