@@ -56,8 +56,9 @@ manifest verifies full upstream archive SHA-256 values before installing Pixi
 architecture. NATS is only a private test broker. The hashes come from the
 upstream release artifacts; see [the NATS checksum manifest](https://github.com/nats-io/nats-server/releases/download/v2.10.24/SHA256SUMS).
 
-`ci/package-lock.json` pins Markdownlint CLI2 0.23.2 and its complete npm closure,
-including the scoped `smol-toml` 1.7.1 fix. Its installer and initial archive
+`ci/package-lock.json` pins Markdownlint CLI2 0.24.0 and its complete npm closure,
+with `re2js` and `katex` overrides that keep `npm audit --omit=dev` clean.
+Its installer and initial archive
 metadata were reused from AchaeanFleet's CI tooling and retained as local
 provenance. Every artifact URL and digest remains inspectable in
 `ci/tool-artifacts.json`; no repository checkout is a runtime dependency.
