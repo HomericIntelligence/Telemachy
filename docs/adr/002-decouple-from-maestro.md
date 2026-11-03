@@ -1,6 +1,6 @@
 # ADR-002: Decouple from ai-maestro; use ProjectAgamemnon exclusively
 
-- **Status:** Accepted
+- **Status:** Accepted (the `maestro_client.py` stub was removed in 0.2.0; the decision is unchanged)
 - **Date:** 2026-05-16
 - **Deciders:** Telemachy maintainers
 - **Context tags:** orchestration, Agamemnon, maestro
@@ -21,8 +21,8 @@ ai-maestro has been removed from the mesh.
 ## Decision
 
 Telemachy targets **ProjectAgamemnon exclusively** as its execution
-backend. The `maestro_client.py` module is retained only as a thin
-deprecation stub and will be removed in a future major release.
+backend. The `maestro_client.py` module was retained only as a thin
+deprecation stub and was removed in 0.2.0.
 
 All new code paths must go through `agamemnon_client.py`. New features
 that imply a backend change must add a new ADR superseding this one.
@@ -51,4 +51,4 @@ Negative:
 
 - `CLAUDE.md` — describes Agamemnon-exclusive execution.
 - Odysseus `docs/adr/006-decouple-from-ai-maestro.md`.
-- `src/telemachy/maestro_client.py` (deprecation stub).
+- `src/telemachy/agamemnon_client.py` (single backend client).

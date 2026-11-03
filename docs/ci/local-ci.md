@@ -10,9 +10,10 @@
    advisory lookups. Missing tools, unavailable advisory services, findings,
    and failed commands fail the applicable check.
 3. Inspect each printed subset and its diagnostics. The suite stops at the first
-   failure. After a fix, run its individual `just ci-*` recipe, then the full
-   suite. `just ci-package-build` creates the distributions consumed by
-   `just ci-package` and `just ci-install`; the full suite orders these steps.
+   failure. After a fix, rerun its subset with
+   `bash scripts/run_ci_local.sh <subset>`, then the full suite with
+   `just ci-all`. Subsets that consume distributions are ordered by the suite:
+   `build` produces them, and `package`/`install` consume them.
 4. Run `just ci-runner-test` for fast regression tests of the runner. These tests
    use private copied repositories and controlled external commands. They do
    not execute an engine or replace the actual Linux suite.
@@ -43,7 +44,7 @@ required check names, merge-queue policy, and tag-only publishing are preserved.
 | `release` | Check version agreement and a stageable changelog; never publish |
 
 Security subset CLI names replace `/` with `-`, for example
-`just ci-security-dependency-scan`. Generated environments, dependency trees,
+`bash scripts/run_ci_local.sh security-dependency-scan`. Generated environments, dependency trees,
 and private agent prompt files do not become first-party lint targets. CLI2's
 native ignore configuration preserves the existing Markdown exclusions.
 

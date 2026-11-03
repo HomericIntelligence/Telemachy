@@ -9,15 +9,14 @@ and teardown via the Agamemnon REST API.
 ## Overview
 
 Telemachy reads a workflow YAML file, creates agents and teams through ProjectAgamemnon,
-assigns tasks with dependency ordering, monitors task completion by polling the Agamemnon
-REST API (event-driven NATS monitoring is planned — see issue #92), and tears down
-provisioned resources according to your policy.
+assigns tasks with dependency ordering, monitors completion from Agamemnon's NATS
+task-lifecycle events, and tears down provisioned resources according to your policy.
 
 No separate agent system is used. All execution is driven exclusively through ProjectAgamemnon.
 
-## MCP Server
-
-See [docs/mcp.md](docs/mcp.md) for the read-only MCP server that lets AI agents query live Agamemnon state during development.
+Work description and epic registration are a separate contract: `register-fleet-epic`
+records a reviewed workflow under an existing GitHub epic and publishes
+`hi.pipeline.epic.{key}.registered`. See [Durable Fleet epic registration](docs/fleet-registration.md).
 
 ## Quick Start
 
@@ -36,17 +35,15 @@ just plan workflows/example.yaml
 just validate workflows/example.yaml
 ```
 
-> **Note:** `status`, `list`, and `cancel` subcommands are not yet
-> implemented — persistent workflow-state storage is out of scope for
-> the current release. Until a state backend lands, query
-> ProjectAgamemnon directly for live agent and team status.
+> **State:** each `run` persists its `WorkflowState` under
+> `TELEMACHY_STATE_DIR` (default `~/.telemachy/state`). `status`, `list`,
+> and `cancel` read that store; `cancel` writes `<id>.cancel`, which the
+> running executor polls.
 
 ## Roadmap
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the canonical roadmap —
-current, next, and future releases plus known limitations. Outstanding
-work (NATS subscriber, state backend for `status`/`list`/`cancel`) is
-tracked under epic [#92](https://github.com/HomericIntelligence/Telemachy/issues/92).
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the canonical roadmap — current,
+next, and future releases plus known limitations.
 
 ## Workflow Schema
 

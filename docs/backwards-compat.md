@@ -14,7 +14,8 @@ The following surfaces follow [Semantic Versioning 2.0.0](https://semver.org/):
    - Default values applied when a field is omitted.
    - Allowed values for enumerated fields (e.g., `runtime`, `teardown`).
 2. **Typer CLI** — the subcommand names, required arguments, and exit codes
-   for `run`, `plan`, `status`, `validate`, `list`, `cancel`.
+   for `run`, `plan`, `status`, `validate`, `list`, `cancel`, `schema`, and
+   `register-fleet-epic`.
 3. **Python public API** — names exported from `telemachy/__init__.py` and
    `telemachy.executor`, `telemachy.models`, `telemachy.config`.
 4. **Environment variables** — names and defaults documented in `AGENTS.md`.
