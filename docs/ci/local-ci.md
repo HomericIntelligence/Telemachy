@@ -10,9 +10,10 @@
    advisory lookups. Missing tools, unavailable advisory services, findings,
    and failed commands fail the applicable check.
 3. Inspect each printed subset and its diagnostics. The suite stops at the first
-   failure. After a fix, run its individual `just ci-*` recipe, then the full
-   suite. `just ci-package-build` creates the distributions consumed by
-   `just ci-package` and `just ci-install`; the full suite orders these steps.
+   failure. After a fix, rerun its subset with
+   `bash scripts/run_ci_local.sh <subset>`, then the full suite with
+   `just ci-all`. Subsets that consume distributions are ordered by the suite:
+   `build` produces them, and `package`/`install` consume them.
 4. Run `just ci-runner-test` for fast regression tests of the runner. These tests
    use private copied repositories and controlled external commands. They do
    not execute an engine or replace the actual Linux suite.
@@ -43,7 +44,7 @@ required check names, merge-queue policy, and tag-only publishing are preserved.
 | `release` | Check version agreement and a stageable changelog; never publish |
 
 Security subset CLI names replace `/` with `-`, for example
-`just ci-security-dependency-scan`. Generated environments, dependency trees,
+`bash scripts/run_ci_local.sh security-dependency-scan`. Generated environments, dependency trees,
 and private agent prompt files do not become first-party lint targets. CLI2's
 native ignore configuration preserves the existing Markdown exclusions.
 
@@ -55,8 +56,9 @@ manifest verifies full upstream archive SHA-256 values before installing Pixi
 architecture. NATS is only a private test broker. The hashes come from the
 upstream release artifacts; see [the NATS checksum manifest](https://github.com/nats-io/nats-server/releases/download/v2.10.24/SHA256SUMS).
 
-`ci/package-lock.json` pins Markdownlint CLI2 0.23.2 and its complete npm closure,
-including the scoped `smol-toml` 1.7.1 fix. Its installer and initial archive
+`ci/package-lock.json` pins Markdownlint CLI2 0.24.0 and its complete npm closure,
+with `re2js` and `katex` overrides that keep `npm audit --omit=dev` clean.
+Its installer and initial archive
 metadata were reused from AchaeanFleet's CI tooling and retained as local
 provenance. Every artifact URL and digest remains inspectable in
 `ci/tool-artifacts.json`; no repository checkout is a runtime dependency.

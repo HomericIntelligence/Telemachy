@@ -34,17 +34,16 @@ runtime dependencies to confirm distribution compatibility.
 | `opentelemetry-api` | Apache-2.0 | yes |
 | `opentelemetry-sdk` | Apache-2.0 | yes |
 | `opentelemetry-instrumentation-httpx` | Apache-2.0 | yes |
-| `mcp` | MIT | yes |
+| `cryptography` | Apache-2.0 / BSD-3-Clause | yes |
+| `nats-py` | Apache-2.0 | yes |
 
 All declared runtime dependencies are permissively licensed and
 compatible with redistribution under BSD-3-Clause.
 
 ## Notes
 
-- `nats-py` (Apache-2.0) was previously declared but has been removed
-  from `pixi.toml`; it will be re-added when the NATS subscriber lands
-  under #92, at which point this audit must be re-run and the row
-  restored.
+- `nats-py` (Apache-2.0) backs the task-lifecycle monitor and Fleet
+  publication; re-run this audit when its major version changes.
 - Apache-2.0 dependencies, when present, retain their attribution
   requirements; any redistribution of Telemachy source or
   binaries must preserve the upstream `LICENSE` and `NOTICE` files

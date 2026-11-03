@@ -89,8 +89,8 @@ off (see "Handoff" below).
 
 Telemachy is a declarative workflow engine that automates multi-agent workflows by calling the
 ProjectAgamemnon REST API. Users define workflows in YAML; Telemachy parses them, provisions agents and
-teams via Agamemnon, assigns tasks with dependency ordering, monitors execution by polling
-Agamemnon's REST API (NATS-based event monitoring is planned but not yet wired up), and
+teams via Agamemnon, assigns tasks with dependency ordering, monitors execution from
+Agamemnon's NATS task-lifecycle events, and
 tears down resources according to the workflow's teardown policy.
 
 **This project uses ProjectAgamemnon exclusively as its execution backend.**
@@ -113,27 +113,28 @@ WorkflowExecutor
     └── AgamemnonClient  →  DELETE /v1/agents/{id}       (teardown)
 ```
 
-_Planned (issue #92): a NATS subscriber consuming Agamemnon task-lifecycle events will
-replace the HTTP polling loop in `_monitor_completion`. Not yet implemented._
+Monitoring is event-driven: `NatsMonitor` subscribes to Agamemnon's
+`hi.tasks.{team_id}.*.*` facts and the executor awaits per-task terminal events.
+`WorkflowExecutor._monitor_completion` (HTTP polling) no longer exists.
 
 ## Implementation Status
 
 ✅ Implemented
 
-- HTTP polling for task completion — `WorkflowExecutor._monitor_completion`
-  (`src/telemachy/executor.py:311`), bounded by `settings.monitor_timeout_seconds`
-  and `settings.monitor_max_polls`.
-- HTTP polling for `blocked_by` dependency unblock inside
-  `_assign_tasks` (`src/telemachy/executor.py` ~283-292).
+- Event-driven task monitoring — `NatsMonitor` (`src/telemachy/nats_monitor.py`)
+  subscribes to `hi.tasks.{team_id}.*.*`; `WorkflowExecutor._wait_for_all_terminal`
+  waits on per-subject terminal events instead of polling.
+- Dependency unblocking driven by the same terminal events inside
+  `_submit_tasks_with_deps`, bounded by `settings.monitor_timeout_seconds`.
+- File-backed workflow state (`src/telemachy/state_store.py`) backing the
+  `status`, `list`, and `cancel` CLI commands.
 - TLS scheme validation on `AGAMEMNON_URL` and `NATS_URL` in
   `AgamemnonClient.__init__` when `REQUIRE_TLS=true`
-  (`src/telemachy/agamemnon_client.py:49-61`).
+  (`src/telemachy/agamemnon_client.py`).
 
 📋 Planned (tracked under #92)
 
-- NATS subscriber consuming Agamemnon task-lifecycle events.
-- Replacement of `_monitor_completion`'s polling loop with event-driven
-  completion detection.
+- Remaining roadmap items only; the NATS subscriber and state store have shipped.
 
 ### Key Components
 
@@ -141,14 +142,15 @@ replace the HTTP polling loop in `_monitor_completion`. Not yet implemented._
 - `telemachy/agamemnon_client.py` — Async HTTP client wrapping all ProjectAgamemnon REST endpoints used
 - `telemachy/rate_limiter.py` — Async token-bucket rate limiter for throttling outbound HTTP calls (#160)
 - `telemachy/executor.py` — Orchestrates the full workflow lifecycle: provision → assign tasks → monitor → teardown
-- `telemachy/cli.py` — Typer CLI (`run`, `plan`, `status`, `validate`, `list`, `cancel`)
+- `telemachy/nats_monitor.py` — NATS task-lifecycle subscriber driving completion detection
+- `telemachy/state_store.py` — File-backed `WorkflowState` store and cancel sentinels
+- `telemachy/cli.py` — Typer CLI (`run`, `plan`, `status`, `validate`, `list`, `cancel`, `register-fleet-epic`)
 - `telemachy/fleet_registration.py`, `fleet_github.py`, `fleet_publish.py` —
   issue-backed Fleet registration, confirmed GitHub mutations, JetStream PubAck
 - `telemachy/workflow_input.py` — shared file validation/loading for CLI commands
 - `telemachy/config.py` — Settings loaded from environment / `.env`
 - `telemachy/telemetry.py` — Observability primitives (correlation IDs, structured logging, metrics, tracing)
-- `docs/ROADMAP.md` — canonical roadmap for outstanding work (NATS
-  subscriber under #92, state backend under v1.0.0). See ADR-003.
+- `docs/ROADMAP.md` — canonical roadmap for outstanding work. See ADR-003.
 
 ## Workflow Schema
 
@@ -185,8 +187,8 @@ principles; note additionally that teardown errors are logged but do
 not block. Beyond those:
 
 1. **Declarative** — workflows describe desired state; Telemachy handles how to get there.
-2. **Observable** — all state transitions are logged; completion is currently detected by HTTP
-   polling against Agamemnon (NATS event-driven completion is planned).
+2. **Observable** — all state transitions are logged; completion is detected from
+   Agamemnon's NATS task-lifecycle events (`NatsMonitor`).
    - **Correlation IDs**: Every log record carries a per-execution `workflow_id` for end-to-end tracing.
    - **Structured logging**: Logs can be emitted as plain text or JSON via `LOG_FORMAT` setting.
    - **Prometheus metrics**: Workflow completion, task outcomes, and HTTP latency are exposed when `METRICS_ENABLED=true`.
@@ -200,19 +202,23 @@ not block. Beyond those:
 Telemachy/
 ├── src/
 │   └── telemachy/
-│       ├── __init__.py           # version
+│       ├── __init__.py           # version and public exports
 │       ├── cli.py                # Typer CLI entry point
 │       ├── config.py             # Settings / env vars
 │       ├── executor.py           # WorkflowExecutor
+│       ├── nats_monitor.py       # task-lifecycle subscriber
+│       ├── state_store.py        # WorkflowState persistence + cancel sentinels
 │       ├── agamemnon_client.py   # ProjectAgamemnon REST client
+│       ├── github_epic.py        # epic key / subject helpers (ADR-013)
+│       ├── fleet_registration.py # durable existing-epic registration
 │       └── models.py             # Pydantic workflow models
 ├── workflows/
 │   ├── example.yaml              # Simple 2-agent example
 │   └── fleet-deploy.yaml         # Docker fleet example
 ├── tests/
-│   ├── __init__.py
-│   ├── test_models.py
-│   └── test_executor.py
+│   ├── conftest.py
+│   ├── unit tests                 # test_models.py, test_executor.py, …
+│   └── integration/               # mock-Agamemnon lifecycle tests
 ├── .env.example
 ├── AGENTS.md
 ├── README.md
@@ -222,13 +228,6 @@ Telemachy/
 
 ## Planned Features
 
-Outstanding work is tracked in [`docs/ROADMAP.md`](docs/ROADMAP.md):
-
-- **NATS subscriber** (#92) — event-driven task-completion monitoring,
-  superseding HTTP polling.
-- **Persistent state backend** — enables the `status`, `list`, and `cancel`
-  CLI commands.
-
 For the full planning picture — including release-line bucketing and
 known limitations — see `docs/ROADMAP.md`. Roadmap drift is regression-
 tested (`tests/test_roadmap.py`).
@@ -236,7 +235,7 @@ tested (`tests/test_roadmap.py`).
 ## Development Guidelines
 
 - All Python files must have type hints on all functions and class attributes.
-- Use `async`/`await` throughout for I/O operations (HTTP today; NATS once the subscriber lands under #92).
+- Use `async`/`await` throughout for I/O operations (HTTP and NATS).
 - Use `httpx.AsyncClient` for all HTTP calls; never `requests`.
 - Pydantic v2 models for all structured data.
 - Errors from Agamemnon should raise typed exceptions, not generic ones.
@@ -341,7 +340,7 @@ path that covers permissions, runner labels, and secrets references.
 | `AGAMEMNON_API_KEY` | `` | API key (if auth enabled) |
 | `AGAMEMNON_RATE_LIMIT_RPS` | `0` | Token-bucket refill rate (requests/sec) for outbound Agamemnon calls. `0` disables throttling. |
 | `AGAMEMNON_RATE_LIMIT_BURST` | `16` | Maximum burst size for the token bucket. Must be `>= 1`; `0` or negative is rejected at startup. |
-| `NATS_URL` | `nats://localhost:4222` | Broker URL for explicit Fleet registration and legacy registration; also validated by `AgamemnonClient` when `REQUIRE_TLS=true`. Task-completion subscription remains planned (#92). |
+| `NATS_URL` | `nats://localhost:4222` | Broker URL for task-lifecycle monitoring (`NatsMonitor`) and Fleet registration; validated by `AgamemnonClient` when `REQUIRE_TLS=true`. |
 | `NATS_CLIENT_TOKEN` | (unset) | Optional backend token for the registration publisher; never persisted in issue metadata. |
 | `GITHUB_TOKEN` | (unset) | Backend GitHub authorization for explicit Fleet registration; required for mutations and unused by offline preview. |
 | `WORKFLOWS_DIR` | `workflows` | Directory to search for workflow YAML files |
@@ -349,11 +348,11 @@ path that covers permissions, runner labels, and secrets references.
 | `REQUIRE_TLS` | `true` | Reject non-TLS Agamemnon connections. Set to `false` to allow cleartext for local dev (logs a WARNING). |
 | `LOG_LEVEL` | `INFO` | Python logging level (DEBUG, INFO, WARNING, ERROR) |
 | `MONITOR_TIMEOUT_SECONDS` | `3600` | Seconds before workflow monitor times out |
-| `MONITOR_MAX_POLLS` | `7200` | Maximum polling attempts for workflow monitor |
+| `MONITOR_MAX_POLLS` | `7200` | Retained for compatibility; the event-driven monitor does not poll. |
 | `DEFAULT_WORKFLOW_TIMEOUT` | `7200` | Per-workflow execution timeout in seconds |
-| `HEALTHCHECK_INTERVAL_SECONDS` | `15` | Seconds between Agamemnon liveness probes during `_monitor_completion`. |
-| `HEALTHCHECK_FAILURE_THRESHOLD` | `2` | Consecutive failed probes before raising `WorkflowConnectivityError`. |
-| `HEALTHCHECK_TIMEOUT_SECONDS` | `5` | Per-probe HTTP timeout (overrides client-wide 30s). |
+| `HEALTHCHECK_INTERVAL_SECONDS` | `15` | Retained for compatibility; the event-driven monitor has no HTTP liveness probe. |
+| `HEALTHCHECK_FAILURE_THRESHOLD` | `2` | Retained for compatibility; see `HEALTHCHECK_INTERVAL_SECONDS`. |
+| `HEALTHCHECK_TIMEOUT_SECONDS` | `5` | Retained for compatibility; see `HEALTHCHECK_INTERVAL_SECONDS`. |
 | `TELEMACHY_STATE_DIR` | `~/.telemachy/state` | Directory for persisted `WorkflowState` JSON files and `<id>.cancel` sentinels. Read by `status`, `list`, `cancel`. `STATE_DIR` is also accepted as an alias. |
 | `AUDIT_LOG_PATH` | (unset) | Path to JSONL audit log. When unset, audit emission is a no-op (NullSink). |
 | `AUDIT_HASH_CHAIN` | `true` | SHA-256 hash chain for tamper-evident audit log. Resumes from existing file on restart. Disable only for tooling/tests. |

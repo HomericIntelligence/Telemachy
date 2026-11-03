@@ -66,9 +66,6 @@ See `docs/backwards-compat.md`.
   PyPI via Trusted Publishing (#153).
 - Packaging: `__all__` exports in `telemachy.__init__` for a clean public
   API (#53); PEP 561 `py.typed` marker (#45).
-- Read-only MCP server (`telemachy-mcp`) exposing `agamemnon_list_agents`
-  and `agamemnon_list_team_tasks` so AI agents can query Agamemnon state
-  during development. Closes #173.
 
 ### Changed
 
@@ -127,6 +124,20 @@ See `docs/backwards-compat.md`.
   signed (#242).
 
 ### Removed
+
+- `telemachy-mcp` and `src/telemachy/mcp_server.py`: the read-only MCP
+  server is outside Telemachy's ecosystem role (it is not a user-facing
+  service). The `mcp` runtime dependency is gone with it.
+- `telemachy.maestro_client`: the ADR-002 deprecation stub had no remaining
+  importers and duplicated `telemachy.agamemnon_client`.
+- `telemachy.cli register-epic` and `telemachy.github_epic.register_epic`:
+  `register-fleet-epic` is now the only epic-registration path. The shared
+  `slugify`, `epic_key`, and `EPIC_SUBJECT` helpers remain.
+- The per-subset `just ci-*` recipes that only forwarded to
+  `scripts/run_ci_local.sh`; use the script directly. `just ci-build`,
+  `just ci-all`, and `just ci-runner-test` remain.
+
+### Removed (previously recorded)
 
 - `MaestroError` / `MaestroClient` backward-compat aliases removed; the
   client is ProjectAgamemnon-only following ADR-006.

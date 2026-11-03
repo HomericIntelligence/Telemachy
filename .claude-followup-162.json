@@ -1,9 +1,0 @@
-{
-  "follow_ups": [],
-  "rejected": [
-    {
-      "title": "Replace asyncio.iscoroutinefunction() with inspect.iscoroutinefunction()",
-      "reason": "Deprecation warning in unrelated code (executor.py:70); belongs in separate maintenance task, not a follow-up to issue #162's state-scoping fix."
-    }
-  ]
-}
