@@ -2,7 +2,6 @@
 
 import json
 import logging
-import threading
 from unittest.mock import patch
 
 import pytest
@@ -10,14 +9,11 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 from telemachy.telemetry import (
-    WORKFLOWS_STARTED,
     JsonFormatter,
     SafePlainFormatter,
     WorkflowContextLogFilter,
-    _started_metrics_ports,
     _started_tracing_services,
     get_tracer,
-    setup_metrics,
     setup_tracing,
     shutdown_tracing,
     workflow_id_var,
@@ -169,50 +165,14 @@ def test_json_formatter_safe_without_filter() -> None:
     assert data["workflow_id"] == "-"
 
 
-# === Metrics tests ===
+# === Tracing tests ===
 
 
 @pytest.fixture(autouse=True)
-def reset_metrics_state() -> None:
-    """Reset metrics state between tests."""
+def reset_tracing_state() -> None:
+    """Reset tracing state between tests."""
 
-    _started_metrics_ports.clear()
     _started_tracing_services.clear()
-
-
-def test_setup_metrics_idempotent() -> None:
-    """setup_metrics can be called multiple times; only first call starts server."""
-    with patch("telemachy.telemetry.start_http_server") as mock_start:
-        setup_metrics(0)
-        assert mock_start.call_count == 1
-        setup_metrics(0)
-        assert mock_start.call_count == 1
-
-
-def test_setup_metrics_thread_safe() -> None:
-    """setup_metrics is thread-safe; multiple threads only start server once."""
-    with patch("telemachy.telemetry.start_http_server") as mock_start:
-        threads = []
-        for _ in range(8):
-            t = threading.Thread(target=setup_metrics, args=(0,))
-            threads.append(t)
-            t.start()
-        for t in threads:
-            t.join()
-        assert mock_start.call_count == 1
-
-
-def test_metrics_counters_increment() -> None:
-    """Prometheus counters increment and are reflected in generate_latest()."""
-    WORKFLOWS_STARTED.labels(workflow_name="test").inc()
-    from prometheus_client import generate_latest
-
-    output = generate_latest()
-    assert b"telemachy_workflows_started_total" in output
-    assert b'workflow_name="test"' in output
-
-
-# === Tracing tests ===
 
 
 def test_setup_tracing_idempotent() -> None:

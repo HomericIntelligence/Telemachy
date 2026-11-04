@@ -79,6 +79,9 @@ See `docs/backwards-compat.md`.
   ProjectArgus in the mesh.
 - `WorkflowExecutor(state_writer=..., sink=...)`. The executor returns its
   final `WorkflowState` from `execute()` and writes no external state.
+- Prometheus metrics (`setup_metrics`, `METRICS_ENABLED`, `METRICS_PORT`) and
+  the `prometheus-client` dependency. ProjectArgus owns mesh observability;
+  Telemachy is not a scrape target.
 
 ### Changed
 

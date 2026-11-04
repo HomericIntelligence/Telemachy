@@ -3,28 +3,28 @@
 ## Scope
 
 Telemachy is a workflow engine. It does not store, classify, or anonymise the
-free-text fields that workflow authors put into a workflow YAML. This document
-tells authors and operators what happens to that text and how to keep personal
-data out of the data flow.
+free-text fields that workflow authors put into a workflow YAML. A
+`WorkflowState` exists only in memory for the duration of a run; Telemachy
+writes no local state file and no local audit log. This document tells authors
+and operators what happens to that text and how to keep personal data out of
+the data flow.
 
 ## What text leaves the Telemachy process
 
 The table below reflects Telemachy's current code paths. **Maintenance note:**
 update this table whenever the data flow changes — in particular, the
 `NatsMonitor` subscriber consumes Agamemnon's task-lifecycle events; any new
-sink must revise this table.
-
-Line numbers are indicative and may drift; the qualifying method name is
-the stable anchor.
+sink must revise this table. The qualifying method name is the stable anchor,
+so line numbers are not recorded.
 
 | Field                  | Sent to Agamemnon?                                                                                              | Logged by Telemachy? | Log level (where)                                                                                                         |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `metadata.name`        | No                                                                                                              | Yes                  | INFO (`WorkflowExecutor._run`, `executor.py:104`)                                                                         |
+| `metadata.name`        | No                                                                                                              | Yes                  | INFO (`WorkflowExecutor._run`)                                                                                            |
 | `metadata.description` | No                                                                                                              | No                   | —                                                                                                                         |
-| `agents[].name`        | Yes (agent create)                                                                                              | Yes                  | DEBUG (`WorkflowExecutor._provision_one_agent`, `executor.py:195`)                                                        |
-| `agents[].model`       | Yes (agent create — as `programArgs`, see `AgamemnonClient._create_local_agent`, `agamemnon_client.py:148-149`) | No                   | —                                                                                                                         |
-| `teams[].name`         | Yes (team create)                                                                                               | Yes                  | INFO (`WorkflowExecutor._create_team`, `executor.py:236`)                                                                 |
-| `tasks[].subject`      | Yes (task create)                                                                                               | Yes                  | INFO (`WorkflowExecutor._submit_tasks_with_deps`, `executor.py:308`); WARNING when a dependency fails (`executor.py:266`) |
+| `agents[].name`        | Yes (agent create)                                                                                              | Yes                  | DEBUG (`WorkflowExecutor._provision_one_agent`)                                                                           |
+| `agents[].model`       | Yes (agent create — as `programArgs`, see `AgamemnonClient._create_local_agent`)                                | No                   | —                                                                                                                         |
+| `teams[].name`         | Yes (team create)                                                                                               | Yes                  | INFO (`WorkflowExecutor._create_team_only`)                                                                               |
+| `tasks[].subject`      | Yes (task create)                                                                                               | Yes                  | INFO (`WorkflowExecutor._submit_tasks_with_deps`); WARNING when a dependency fails (same method)                           |
 | `tasks[].description`  | Yes (task create — see `AgamemnonClient.create_task`, `agamemnon_client.py`)                                    | No                   | —                                                                                                                         |
 
 ## Author guidance

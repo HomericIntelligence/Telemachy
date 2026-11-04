@@ -21,8 +21,9 @@ not yet built.
 
 1. Bound to GitHub Milestones (`v0.1.0`, `v0.2.0`, `v1.0.0`) so issues
    can be filtered by release line in the UI.
-2. Tagged with the cross-cutting labels `roadmap`, `nats-subscriber`,
-   and `state-backend`.
+2. Tagged with the cross-cutting labels `roadmap` and `nats-subscriber`.
+   (`state-backend` was retired with the local state store; see the
+   amendment below.)
 3. Regression-tested (`tests/test_roadmap.py`) for required H2
    sections and link integrity.
 4. Linked from `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`, and the
@@ -52,8 +53,16 @@ Negative:
 - **Embed roadmap in `README.md`.** Rejected: would dilute the
   README's role as a quickstart and make the regression test brittle.
 
+## Amendment (2026-11-04)
+
+The `state-backend` work item is withdrawn. Issue #348 removed
+`telemachy.state_store` together with the `status`, `list`, and `cancel`
+commands: Telemachy keeps a `WorkflowState` in memory for the duration of
+a run, and ProjectAgamemnon owns live workflow and task state. The Context
+section stays as the record of the 2026-06-03 finding.
+
 ## References
 
-- Issue #167, #92
+- Issue #167, #92, #348
 - ADR-001, ADR-002
 - `docs/backwards-compat.md`

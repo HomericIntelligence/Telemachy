@@ -1,4 +1,4 @@
-"""Observability primitives: correlation IDs, structured logging, metrics, and tracing."""
+"""Observability primitives: correlation IDs, structured logging, and tracing."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ from opentelemetry.sdk.trace.export import (
     SpanExportResult,
 )
 from opentelemetry.trace import Tracer
-from prometheus_client import Counter, Histogram, start_http_server
 
 # === Correlation context ===
 
@@ -67,55 +66,6 @@ class SafePlainFormatter(logging.Formatter):
 
 class TelemachyDefaultHandler(logging.StreamHandler):
     """Marker subclass so _setup_logging can identify and replace its own handler."""
-
-
-# === Metrics ===
-
-_metrics_lock = threading.Lock()
-_started_metrics_ports: set[int] = set()
-
-
-def setup_metrics(port: int) -> None:
-    """Start the Prometheus /metrics HTTP server. Idempotent in-process.
-
-    Single-process assumption: Telemachy is a one-shot CLI. Multi-process
-    forking is not supported by this module; a fresh process resets state.
-    """
-    with _metrics_lock:
-        if port in _started_metrics_ports:
-            return
-        start_http_server(port)
-        _started_metrics_ports.add(port)
-
-
-WORKFLOWS_STARTED = Counter(
-    "telemachy_workflows_started_total", "Workflows started", ["workflow_name"]
-)
-WORKFLOWS_COMPLETED = Counter(
-    "telemachy_workflows_completed_total",
-    "Workflows reaching a terminal status",
-    ["workflow_name", "status"],
-)
-WORKFLOW_DURATION = Histogram(
-    "telemachy_workflow_duration_seconds",
-    "End-to-end workflow duration",
-    ["workflow_name", "status"],
-)
-TASKS_TOTAL = Counter(
-    "telemachy_tasks_total",
-    "Tasks observed reaching a terminal state",
-    ["status"],
-)
-AGAMEMNON_REQUESTS = Counter(
-    "telemachy_agamemnon_requests_total",
-    "Agamemnon HTTP requests",
-    ["method", "endpoint", "status_code"],
-)
-AGAMEMNON_LATENCY = Histogram(
-    "telemachy_agamemnon_request_seconds",
-    "Agamemnon HTTP request latency",
-    ["method", "endpoint"],
-)
 
 
 # === Tracing ===

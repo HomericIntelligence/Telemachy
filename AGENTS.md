@@ -146,7 +146,7 @@ Remaining roadmap items are tracked in `docs/ROADMAP.md` (ADR-003).
   issue-backed Fleet registration, confirmed GitHub mutations, JetStream PubAck
 - `telemachy/workflow_input.py` — shared file validation/loading for CLI commands
 - `telemachy/config.py` — Settings loaded from environment / `.env`
-- `telemachy/telemetry.py` — Observability primitives (correlation IDs, structured logging, metrics, tracing)
+- `telemachy/telemetry.py` — Observability primitives (correlation IDs, structured logging, tracing)
 - `docs/ROADMAP.md` — canonical roadmap for outstanding work. See ADR-003.
 
 ## Workflow Schema
@@ -188,7 +188,6 @@ not block. Beyond those:
    Agamemnon's NATS task-lifecycle events (`NatsMonitor`).
    - **Correlation IDs**: Every log record carries a per-execution `workflow_id` for end-to-end tracing.
    - **Structured logging**: Logs can be emitted as plain text or JSON via `LOG_FORMAT` setting.
-   - **Prometheus metrics**: Workflow completion, task outcomes, and HTTP latency are exposed when `METRICS_ENABLED=true`.
    - **OpenTelemetry tracing**: Spans are emitted for each workflow phase (provisioning, team creation, monitoring,
      teardown) when `OTEL_ENABLED=true`.
 3. **Type-safe** — all Python code uses type hints; Pydantic validates all external data.
@@ -346,8 +345,6 @@ path that covers permissions, runner labels, and secrets references.
 | `HEALTHCHECK_FAILURE_THRESHOLD` | `2` | Retained for compatibility; see `HEALTHCHECK_INTERVAL_SECONDS`. |
 | `HEALTHCHECK_TIMEOUT_SECONDS` | `5` | Retained for compatibility; see `HEALTHCHECK_INTERVAL_SECONDS`. |
 | `LOG_FORMAT` | `plain` | Log format: `plain` (human-readable, default) or `json` (one JSON object per line) |
-| `METRICS_ENABLED` | `false` | Enable Prometheus metrics endpoint when `true` |
-| `METRICS_PORT` | `9464` | Port to expose Prometheus metrics on when `METRICS_ENABLED=true` |
 | `OTEL_ENABLED` | `false` | Enable OpenTelemetry tracing when `true` (console exporter only in this release) |
 | `OTEL_SERVICE_NAME` | `telemachy` | Service name for OpenTelemetry resource |
 | `OTEL_EXPORTER` | `console` | OTel exporter type (only `console` supported in this release; OTLP is a planned follow-up) |
