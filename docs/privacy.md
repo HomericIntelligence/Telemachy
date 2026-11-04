@@ -17,15 +17,15 @@ update this table whenever the data flow changes — in particular, the
 sink must revise this table. The qualifying method name is the stable anchor,
 so line numbers are not recorded.
 
-| Field                  | Sent to Agamemnon?                                                                                              | Logged by Telemachy? | Log level (where)                                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `metadata.name`        | No                                                                                                              | Yes                  | INFO (`WorkflowExecutor._run`)                                                                                            |
-| `metadata.description` | No                                                                                                              | No                   | —                                                                                                                         |
-| `agents[].name`        | Yes (agent create)                                                                                              | Yes                  | DEBUG (`WorkflowExecutor._provision_one_agent`)                                                                           |
-| `agents[].model`       | Yes (agent create — as `programArgs`, see `AgamemnonClient._create_local_agent`)                                | No                   | —                                                                                                                         |
-| `teams[].name`         | Yes (team create)                                                                                               | Yes                  | INFO (`WorkflowExecutor._create_team_only`)                                                                               |
-| `tasks[].subject`      | Yes (task create)                                                                                               | Yes                  | INFO (`WorkflowExecutor._submit_tasks_with_deps`); WARNING when a dependency fails (same method)                           |
-| `tasks[].description`  | Yes (task create — see `AgamemnonClient.create_task`, `agamemnon_client.py`)                                    | No                   | —                                                                                                                         |
+| Field                  | Sent to Agamemnon?                                                               | Logged by Telemachy? | Log level (where)                                                                                |
+| ---------------------- | -------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------ |
+| `metadata.name`        | No                                                                               | Yes                  | INFO (`WorkflowExecutor._run`)                                                                   |
+| `metadata.description` | No                                                                               | No                   | —                                                                                                |
+| `agents[].name`        | Yes (agent create)                                                               | Yes                  | DEBUG (`WorkflowExecutor._provision_one_agent`)                                                  |
+| `agents[].model`       | Yes (agent create — as `programArgs`, see `AgamemnonClient._create_local_agent`) | No                   | —                                                                                                |
+| `teams[].name`         | Yes (team create)                                                                | Yes                  | INFO (`WorkflowExecutor._create_team_only`)                                                      |
+| `tasks[].subject`      | Yes (task create)                                                                | Yes                  | INFO (`WorkflowExecutor._submit_tasks_with_deps`); WARNING when a dependency fails (same method) |
+| `tasks[].description`  | Yes (task create — see `AgamemnonClient.create_task`, `agamemnon_client.py`)     | No                   | —                                                                                                |
 
 ## Author guidance
 
