@@ -75,11 +75,9 @@ pip uninstall telemachy            # if installed via pip
 rm -rf <repo-checkout>/.pixi
 ```
 
-Workflow definitions and live task state live in ProjectAgamemnon.
-Telemachy additionally persists its own `WorkflowState` JSON under
-`TELEMACHY_STATE_DIR` (default `~/.telemachy/state`) for `status`,
-`list`, and `cancel`; remove that directory to reset local workflow
-history.
+Workflow definitions and live task state live in ProjectAgamemnon;
+Telemachy keeps no local state of its own, so uninstalling leaves
+nothing behind.
 
 ## Troubleshooting
 

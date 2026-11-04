@@ -202,9 +202,6 @@ def run(
                 )
 
             async with AgamemnonClient(**settings.client_kwargs()) as client:
-                from telemachy.audit import build_sink_from_settings
-                from telemachy.state_store import FileStateStore
-
                 # Take ONE snapshot, use it for both the --force warning AND
                 # the executor's lookup tables (avoid two round-trips).
                 snapshot: tuple[list, list] | None = None
@@ -226,37 +223,17 @@ def run(
                             "Clean up manually if desired.[/yellow]"
                         )
 
-                store = FileStateStore(settings.state_dir)
-                sink = build_sink_from_settings()
                 workflow_id = str(uuid.uuid4())[:8]
                 console.print(f"[dim]workflow id:[/dim] {workflow_id}")
 
-                async def _watch_cancel() -> None:
-                    while not stop_event.is_set():
-                        if store.is_cancel_requested(workflow_id):
-                            logger.warning("Cancel sentinel detected for %s", workflow_id)
-                            stop_event.set()
-                            return
-                        await asyncio.sleep(1.0)
-
-                watcher = asyncio.create_task(_watch_cancel())
-                try:
-                    executor = WorkflowExecutor(
-                        client,
-                        stop_event=stop_event,
-                        force=force,
-                        existing_snapshot=snapshot,
-                        state_writer=store.save,
-                        sink=sink,
-                    )
-                    executor.add_hook("on_task_complete", _on_task_complete)
-                    result = await executor.execute(spec, workflow_id=workflow_id)
-                finally:
-                    watcher.cancel()
-                    # Wait for the cancelled watcher to finish unwinding;
-                    # CancelledError is expected and swallowed by gather.
-                    await asyncio.gather(watcher, return_exceptions=True)
-                    store.clear_cancel(workflow_id)
+                executor = WorkflowExecutor(
+                    client,
+                    stop_event=stop_event,
+                    force=force,
+                    existing_snapshot=snapshot,
+                )
+                executor.add_hook("on_task_complete", _on_task_complete)
+                result = await executor.execute(spec, workflow_id=workflow_id)
 
         if result.status == "completed":
             console.print(f"[bold green]Workflow completed.[/bold green] id={result.workflow_id}")
@@ -293,86 +270,6 @@ def validate(
     _validate_workflow_path(workflow_path)
     spec = _load_workflow(workflow_path)
     console.print(f"[bold green]Valid.[/bold green] Workflow: {spec.name}")
-
-
-@app.command()
-def status(
-    workflow_id: Annotated[str, typer.Argument(help="Workflow ID returned by 'run'")],
-) -> None:
-    """Show the status of a workflow."""
-    from telemachy.state_store import (
-        CorruptStateError,
-        FileStateStore,
-        WorkflowNotFoundError,
-    )
-
-    store = FileStateStore(settings.state_dir)
-    try:
-        state = store.load(workflow_id)
-    except WorkflowNotFoundError:
-        err_console.print(f"[red]Workflow not found:[/red] {workflow_id}")
-        raise typer.Exit(1) from None
-    except CorruptStateError as exc:
-        err_console.print(f"[red]State file is corrupt:[/red] {exc}")
-        raise typer.Exit(1) from None
-    table = Table(title=f"Workflow {state.workflow_id}")
-    table.add_column("Field")
-    table.add_column("Value")
-    table.add_row("name", state.spec.name)
-    table.add_row("status", state.status)
-    table.add_row("started_at", state.started_at or "-")
-    table.add_row("completed_at", state.completed_at or "-")
-    table.add_row("error", state.error or "-")
-    console.print(table)
-
-
-@app.command(name="list")
-def list_workflows() -> None:
-    """List all workflows recorded in the state directory."""
-    from telemachy.state_store import FileStateStore
-
-    store = FileStateStore(settings.state_dir)
-    states = store.list()
-    if not states:
-        console.print("[dim]No workflows recorded.[/dim]")
-        return
-    table = Table(title="Workflows")
-    for col in ("ID", "Name", "Status", "Started"):
-        table.add_column(col)
-    for s in states:
-        table.add_row(s.workflow_id, s.spec.name, s.status, s.started_at or "-")
-    console.print(table)
-
-
-@app.command()
-def cancel(
-    workflow_id: Annotated[str, typer.Argument(help="Workflow ID to cancel")],
-) -> None:
-    """Request cancellation of a running workflow."""
-    from telemachy.state_store import (
-        CorruptStateError,
-        FileStateStore,
-        WorkflowNotFoundError,
-    )
-
-    store = FileStateStore(settings.state_dir)
-    try:
-        state = store.request_cancel(workflow_id)
-    except WorkflowNotFoundError:
-        err_console.print(f"[red]Workflow not found:[/red] {workflow_id}")
-        raise typer.Exit(1) from None
-    except CorruptStateError as exc:
-        err_console.print(f"[red]State file is corrupt:[/red] {exc}")
-        raise typer.Exit(1) from None
-    if state.status in {"completed", "failed", "cancelled"}:
-        console.print(
-            f"[yellow]Workflow {workflow_id} already {state.status} — nothing to cancel.[/yellow]"
-        )
-        return
-    console.print(
-        f"[green]Cancellation requested for {workflow_id}.[/green] "
-        f"(detected within ~1s, applied within ~6s)"
-    )
 
 
 @app.command()

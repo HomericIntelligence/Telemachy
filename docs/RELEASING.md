@@ -25,8 +25,8 @@ The public surface area governed by SemVer is:
 
 - The **workflow YAML schema** (`apiVersion: telemachy/v1`, field names,
   field types, default values).
-- The Typer CLI subcommand contract (`run`, `plan`, `status`, `validate`,
-  `list`, `cancel`) — names and required arguments.
+- The Typer CLI subcommand contract (`run`, `plan`, `validate`, `schema`,
+  `register-fleet-epic`) — names and required arguments.
 - Public Python imports under `telemachy.*` (executor, models, config).
 
 Internal: HTTP client retry tuning, monitor poll interval defaults,

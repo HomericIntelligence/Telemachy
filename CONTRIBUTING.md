@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Telemachy! This is the workflow
 execution engine for the [HomericIntelligence](https://github.com/HomericIntelligence)
-distributed agent mesh — it runs, plans, monitors, and cancels named workflow YAML files
+distributed agent mesh — it runs, plans, and monitors named workflow YAML files
 against Agamemnon's REST API. (A NATS-based event channel is planned — see issue #92 — but is not yet wired up.)
 
 For an overview of the full ecosystem, see the
@@ -182,9 +182,6 @@ just plan <WORKFLOW>
 # Validate workflow YAML
 just validate <WORKFLOW>
 ```
-
-> `status`, `list`, and `cancel` are not yet implemented — see the
-> "Planned Features" section in [AGENTS.md](./AGENTS.md).
 
 ### Python Conventions
 

@@ -64,9 +64,9 @@ off (see "Handoff" below).
 - Fleet registration publishes through the existing `homeric-pipeline` stream;
   it validates retention and never provisions or changes a stream. This is
   separate from task-completion monitoring.
-- Future NATS-based completion monitoring will subscribe to subjects
-  documented in Odysseus `docs/adr/005-nats-subject-schema.md`. Until
-  that lands Telemachy polls Agamemnon via HTTP.
+- Task-completion monitoring subscribes to the NATS subjects documented in
+  Odysseus `docs/adr/005-nats-subject-schema.md` via `NatsMonitor`; Telemachy
+  no longer polls Agamemnon for task completion.
 
 ## Coordination invariants
 
@@ -126,15 +126,13 @@ Monitoring is event-driven: `NatsMonitor` subscribes to Agamemnon's
   waits on per-subject terminal events instead of polling.
 - Dependency unblocking driven by the same terminal events inside
   `_submit_tasks_with_deps`, bounded by `settings.monitor_timeout_seconds`.
-- File-backed workflow state (`src/telemachy/state_store.py`) backing the
-  `status`, `list`, and `cancel` CLI commands.
 - TLS scheme validation on `AGAMEMNON_URL` and `NATS_URL` in
   `AgamemnonClient.__init__` when `REQUIRE_TLS=true`
   (`src/telemachy/agamemnon_client.py`).
 
-📋 Planned (tracked under #92)
+📋 Planned
 
-- Remaining roadmap items only; the NATS subscriber and state store have shipped.
+Remaining roadmap items are tracked in `docs/ROADMAP.md` (ADR-003).
 
 ### Key Components
 
@@ -143,8 +141,7 @@ Monitoring is event-driven: `NatsMonitor` subscribes to Agamemnon's
 - `telemachy/rate_limiter.py` — Async token-bucket rate limiter for throttling outbound HTTP calls (#160)
 - `telemachy/executor.py` — Orchestrates the full workflow lifecycle: provision → assign tasks → monitor → teardown
 - `telemachy/nats_monitor.py` — NATS task-lifecycle subscriber driving completion detection
-- `telemachy/state_store.py` — File-backed `WorkflowState` store and cancel sentinels
-- `telemachy/cli.py` — Typer CLI (`run`, `plan`, `status`, `validate`, `list`, `cancel`, `register-fleet-epic`)
+- `telemachy/cli.py` — Typer CLI (`run`, `plan`, `validate`, `schema`, `register-fleet-epic`)
 - `telemachy/fleet_registration.py`, `fleet_github.py`, `fleet_publish.py` —
   issue-backed Fleet registration, confirmed GitHub mutations, JetStream PubAck
 - `telemachy/workflow_input.py` — shared file validation/loading for CLI commands
@@ -207,7 +204,6 @@ Telemachy/
 │       ├── config.py             # Settings / env vars
 │       ├── executor.py           # WorkflowExecutor
 │       ├── nats_monitor.py       # task-lifecycle subscriber
-│       ├── state_store.py        # WorkflowState persistence + cancel sentinels
 │       ├── agamemnon_client.py   # ProjectAgamemnon REST client
 │       ├── github_epic.py        # epic key / subject helpers (ADR-013)
 │       ├── fleet_registration.py # durable existing-epic registration
@@ -303,18 +299,14 @@ just fleet-register reviewed.yaml --repo OWNER/REPO --epic-issue 42 \
   --registration-key reviewed-idea --dry-run  # offline Fleet registration preview
 ```
 
-## Workflow State Persistence
+## Workflow State
 
-`status`, `list`, and `cancel` are backed by a file-based `WorkflowState`
-store (`src/telemachy/state_store.py`). `run` persists each workflow's
-state as JSON under `TELEMACHY_STATE_DIR` (default `~/.telemachy/state`);
-`status`/`list` read it back, and `cancel` writes a `<id>.cancel` sentinel
-that the executor's watcher polls. This is independent of the planned NATS
-event ingestion (#92), which scopes live task-lifecycle events only.
-
-Implementation detail: cancellation propagates via the `<id>.cancel`
-sentinel polled by `cli.run` (1s interval); the executor's existing
-`stop_event` is set when the sentinel appears.
+Telemachy keeps a `WorkflowState` in memory for the duration of a `run` and
+returns it from `WorkflowExecutor.execute`; it writes no local state of its
+own. Workflow definitions and live task state belong to ProjectAgamemnon,
+which is the system of record for status and cancellation. Stopping an
+in-flight workflow uses OS signals (`SIGINT`/`SIGTERM`), which set the
+executor's `stop_event`.
 
 ## Testing layers
 
@@ -353,9 +345,6 @@ path that covers permissions, runner labels, and secrets references.
 | `HEALTHCHECK_INTERVAL_SECONDS` | `15` | Retained for compatibility; the event-driven monitor has no HTTP liveness probe. |
 | `HEALTHCHECK_FAILURE_THRESHOLD` | `2` | Retained for compatibility; see `HEALTHCHECK_INTERVAL_SECONDS`. |
 | `HEALTHCHECK_TIMEOUT_SECONDS` | `5` | Retained for compatibility; see `HEALTHCHECK_INTERVAL_SECONDS`. |
-| `TELEMACHY_STATE_DIR` | `~/.telemachy/state` | Directory for persisted `WorkflowState` JSON files and `<id>.cancel` sentinels. Read by `status`, `list`, `cancel`. `STATE_DIR` is also accepted as an alias. |
-| `AUDIT_LOG_PATH` | (unset) | Path to JSONL audit log. When unset, audit emission is a no-op (NullSink). |
-| `AUDIT_HASH_CHAIN` | `true` | SHA-256 hash chain for tamper-evident audit log. Resumes from existing file on restart. Disable only for tooling/tests. |
 | `LOG_FORMAT` | `plain` | Log format: `plain` (human-readable, default) or `json` (one JSON object per line) |
 | `METRICS_ENABLED` | `false` | Enable Prometheus metrics endpoint when `true` |
 | `METRICS_PORT` | `9464` | Port to expose Prometheus metrics on when `METRICS_ENABLED=true` |
