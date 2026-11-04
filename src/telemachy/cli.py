@@ -47,7 +47,6 @@ def _setup_logging() -> None:
         SafePlainFormatter,
         TelemachyDefaultHandler,
         WorkflowContextLogFilter,
-        setup_metrics,
         setup_tracing,
     )
 
@@ -82,8 +81,6 @@ def _setup_logging() -> None:
     # AgamemnonClient context manager).
     if settings.otel_enabled:
         setup_tracing(settings.otel_service_name)
-    if settings.metrics_enabled:
-        setup_metrics(settings.metrics_port)
 
 
 def _print_plan(spec: WorkflowSpec) -> None:

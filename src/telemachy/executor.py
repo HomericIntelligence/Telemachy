@@ -17,10 +17,6 @@ from telemachy.constants import DONE_STATUSES as _DONE_STATUSES
 from telemachy.models import AgentSpec, TeamSpec, WorkflowSpec, WorkflowState
 from telemachy.nats_monitor import NatsMonitor, NatsUnavailableError
 from telemachy.telemetry import (
-    TASKS_TOTAL,
-    WORKFLOW_DURATION,
-    WORKFLOWS_COMPLETED,
-    WORKFLOWS_STARTED,
     get_tracer,
     workflow_id_var,
     workflow_name_var,
@@ -135,8 +131,6 @@ class WorkflowExecutor:
                     "telemachy.team_count": len(spec.teams),
                 },
             ):
-                WORKFLOWS_STARTED.labels(workflow_name=spec.name).inc()
-                start = time.monotonic()
                 state = WorkflowState(
                     workflow_id=workflow_id,
                     spec=spec,
@@ -226,12 +220,6 @@ class WorkflowExecutor:
 
                 finally:
                     await self._teardown(state)
-                    WORKFLOW_DURATION.labels(
-                        workflow_name=spec.name, status=state.status
-                    ).observe(time.monotonic() - start)
-                    WORKFLOWS_COMPLETED.labels(
-                        workflow_name=spec.name, status=state.status
-                    ).inc()
 
                 return state
         finally:
@@ -569,8 +557,7 @@ class WorkflowExecutor:
     async def _wait_for_all_terminal(self, state: WorkflowState, monitor: NatsMonitor) -> None:
         """Wait until every SUBMITTED task subject has a terminal status via NATS events.
 
-        Emits the same observability (TASKS_TOTAL metric) the prior
-        HTTP-polling monitor emitted, and respects stop_event / monitor_timeout. The set of subjects
+        Respects stop_event and monitor_timeout. The set of subjects
         for which we've emitted a terminal-state callback is the per-execution
         instance set (#162/#203). NATS connection loss raises NatsUnavailableError.
         """
@@ -602,8 +589,6 @@ class WorkflowExecutor:
 
                 for subj in watched:
                     status = monitor.latest_status(subj)
-                    if status in _DONE_STATUSES and subj not in self._emitted_task_events:
-                        TASKS_TOTAL.labels(status=status).inc()
                     if status in {"failed", "error"} and subj not in self._emitted_task_events:
                         self._emitted_task_events.add(subj)
                         any_failed = True

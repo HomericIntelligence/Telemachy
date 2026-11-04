@@ -49,8 +49,6 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     default_workflow_timeout: float = 7200.0
     log_format: str = "plain"
-    metrics_enabled: bool = False
-    metrics_port: int = 9464
     otel_enabled: bool = False
     otel_service_name: str = "telemachy"
     otel_exporter: str = "console"

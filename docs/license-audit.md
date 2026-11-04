@@ -8,6 +8,7 @@ runtime dependencies to confirm distribution compatibility.
 
 2026-05-16 (initial)
 2026-06-04 (added issue #163 observability packages)
+2026-11-04 (removed the metrics subsystem and `prometheus-client`)
 
 ## Method
 
@@ -30,7 +31,6 @@ runtime dependencies to confirm distribution compatibility.
 | `pyyaml` | MIT | yes |
 | `rich` | MIT | yes |
 | `typer` | MIT | yes |
-| `prometheus-client` | Apache-2.0 | yes |
 | `opentelemetry-api` | Apache-2.0 | yes |
 | `opentelemetry-sdk` | Apache-2.0 | yes |
 | `opentelemetry-instrumentation-httpx` | Apache-2.0 | yes |
