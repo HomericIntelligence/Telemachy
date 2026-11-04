@@ -42,6 +42,19 @@ documentation change in Telemachy. It complements `CONTRIBUTING.md`.
       [`docs/ci/merge-queue.md`](ci/merge-queue.md).
 - [ ] Time and resource impact noted in the PR description.
 
+## Test quality
+
+Aim for the smallest suite that names every behaviour.
+
+- One test per contract, with `@pytest.mark.parametrize` for input variants,
+  rather than near-identical tests per field or per branch.
+- Assert the outcome a caller observes — resulting state, requests sent, statuses
+  recorded — rather than how many times an internal mock was called.
+- Share workflow/client fixtures through `tests/conftest.py`; do not copy them
+  into each module.
+- Leave no permanently skipped tests: delete them or fix the limitation they
+  point at.
+
 ## Not done
 
 A PR that fails any of the above is *Not Done*. Reviewers should request
