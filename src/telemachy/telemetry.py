@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 import threading
+from collections.abc import Sequence
 from contextvars import ContextVar
 from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    ConsoleSpanExporter,
+    SpanExportResult,
+)
 from opentelemetry.trace import Tracer
 from prometheus_client import Counter, Histogram, start_http_server
 
@@ -118,6 +124,24 @@ _tracing_lock = threading.Lock()
 _started_tracing_services: set[str] = set()
 
 
+class LiveStreamConsoleSpanExporter(ConsoleSpanExporter):
+    """Console exporter that resolves ``sys.stdout`` at export time.
+
+    ``ConsoleSpanExporter`` binds ``sys.stdout`` when it is defined, so a
+    caller that swaps stdout afterwards (pytest capture does) leaves the
+    exporter writing to a stream that is later closed. Reporting a batch as
+    failed when the resolved stream is gone keeps that from raising
+    ``ValueError: I/O operation on closed file`` out of the export thread.
+    """
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        stream = sys.stdout
+        if stream is None or getattr(stream, "closed", False):
+            return SpanExportResult.FAILURE
+        self.out = stream
+        return super().export(spans)
+
+
 def setup_tracing(service_name: str) -> None:
     """Install a TracerProvider with the ConsoleSpanExporter.
 
@@ -129,10 +153,24 @@ def setup_tracing(service_name: str) -> None:
         if service_name in _started_tracing_services:
             return
         provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
-        provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+        provider.add_span_processor(BatchSpanProcessor(LiveStreamConsoleSpanExporter()))
         trace.set_tracer_provider(provider)
         HTTPXClientInstrumentor().instrument()
         _started_tracing_services.add(service_name)
+
+
+def shutdown_tracing() -> None:
+    """Flush and stop the TracerProvider installed by :func:`setup_tracing`.
+
+    ``TracerProvider`` registers its own ``atexit`` flush, which runs after any
+    caller that owns stdout (a pytest session, a closed pipe) has torn it down.
+    Shutting down explicitly flushes while the stream is still usable; the
+    provider stays shut down for the rest of the process.
+    """
+    with _tracing_lock:
+        provider = trace.get_tracer_provider()
+        if isinstance(provider, TracerProvider):
+            provider.shutdown()
 
 
 def get_tracer() -> Tracer:

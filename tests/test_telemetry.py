@@ -19,6 +19,7 @@ from telemachy.telemetry import (
     get_tracer,
     setup_metrics,
     setup_tracing,
+    shutdown_tracing,
     workflow_id_var,
     workflow_name_var,
 )
@@ -238,8 +239,13 @@ async def test_setup_tracing_with_console_exporter() -> None:
     """setup_tracing configures a working TracerProvider with ConsoleSpanExporter."""
 
     setup_tracing("test-service")
-    tracer = get_tracer()
-    with tracer.start_as_current_span("test-span"):
-        pass
-    # ConsoleSpanExporter prints to stderr but does not track spans.
-    # The test passes if no exception is raised.
+    try:
+        tracer = get_tracer()
+        with tracer.start_as_current_span("test-span"):
+            pass
+        # ConsoleSpanExporter prints spans to stdout but does not track them.
+        # The test passes if no exception is raised.
+    finally:
+        # Flush while stdout is still live: the provider's own atexit flush
+        # would otherwise run after pytest has closed its capture stream.
+        shutdown_tracing()
