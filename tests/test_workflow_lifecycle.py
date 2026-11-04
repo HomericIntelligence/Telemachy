@@ -100,7 +100,7 @@ async def test_failed_dependency_skips_downstream(
     """
     from unittest.mock import patch
 
-    from tests.conftest import _create_mock_nats_monitor
+    from tests.conftest import make_mock_monitor
 
     stub = stub_agamemnon_factory(task_statuses={"A": ["failed"]})
     client = client_pool.register(make_client_for(stub))
@@ -113,7 +113,7 @@ async def test_failed_dependency_skips_downstream(
         teardown="on_failure",
     )
 
-    monitor = _create_mock_nats_monitor()
+    monitor = make_mock_monitor()
     # A is terminal-failed from the start; B must never become known/submitted.
     monitor.record_status("A", "failed")
 
