@@ -216,13 +216,11 @@ class AgamemnonClient:
         Returns ``True`` iff Agamemnon answers a 2xx response within *timeout*
         seconds.
 
-        NOTE: This method intentionally bypasses ``_request_with_retry``.
-        The heartbeat loop in ``WorkflowExecutor`` is the retry/threshold
-        gate — wrapping ping() in 3 retries with exponential backoff would
-        swallow up to ~7s of connectivity loss per probe and defeat the
-        purpose of an out-of-band liveness signal. To tune resilience,
-        change ``HEALTHCHECK_FAILURE_THRESHOLD`` /
-        ``HEALTHCHECK_INTERVAL_SECONDS`` rather than this method.
+        NOTE: This method intentionally bypasses ``_request_with_retry``, so a
+        probe costs at most *timeout* seconds. Wrapping ping() in 3 retries
+        with exponential backoff would swallow up to ~7s of connectivity loss
+        per probe and defeat the purpose of an out-of-band liveness signal.
+        Callers that want retries or a failure threshold own that loop.
         """
         try:
             resp = await self._http.request("GET", "/v1/agents", timeout=timeout)

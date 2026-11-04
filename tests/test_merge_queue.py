@@ -20,6 +20,7 @@ EXPECTED_REQUIRED_CONTEXTS = [
     "install",
     "integration-tests",
     "lint",
+    "markdownlint",
     "package",
     "release",
     "schema-validation",

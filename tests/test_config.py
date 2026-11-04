@@ -88,10 +88,6 @@ class TestDefaults:
         monkeypatch.delenv("MONITOR_TIMEOUT_SECONDS", raising=False)
         assert Settings(_env_file=None).monitor_timeout_seconds == 3600.0
 
-    def test_monitor_max_polls_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("MONITOR_MAX_POLLS", raising=False)
-        assert Settings(_env_file=None).monitor_max_polls == 7200
-
     def test_default_workflow_timeout_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("DEFAULT_WORKFLOW_TIMEOUT", raising=False)
         assert Settings(_env_file=None).default_workflow_timeout == 7200.0
@@ -133,10 +129,6 @@ class TestEnvOverrides:
     ) -> None:
         monkeypatch.setenv("MONITOR_TIMEOUT_SECONDS", "120.5")
         assert Settings(_env_file=None).monitor_timeout_seconds == 120.5
-
-    def test_monitor_max_polls_override_parses_int(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("MONITOR_MAX_POLLS", "42")
-        assert Settings(_env_file=None).monitor_max_polls == 42
 
     def test_default_workflow_timeout_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("DEFAULT_WORKFLOW_TIMEOUT", "9000")

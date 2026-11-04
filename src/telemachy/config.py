@@ -42,10 +42,6 @@ class Settings(BaseSettings):
     host_id: str = "hermes"
     require_tls: bool = True
     monitor_timeout_seconds: float = 3600.0
-    monitor_max_polls: int = 7200
-    healthcheck_interval_seconds: float = 15.0
-    healthcheck_failure_threshold: int = 2
-    healthcheck_timeout_seconds: float = 5.0
     log_level: str = "INFO"
     default_workflow_timeout: float = 7200.0
     log_format: str = "plain"
