@@ -138,6 +138,53 @@ def test_plan_valid_workflow(valid_workflow_file: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _run_with_mocked_backend(workflow_file: Path, status: str, error: str | None) -> object:
+    """Invoke `run` with the client and executor mocked out."""
+    mock_state = MagicMock()
+    mock_state.workflow_id = "run-id-123"
+    mock_state.status = status
+    mock_state.error = error
+
+    mock_client = MagicMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    mock_client.list_agents = AsyncMock(return_value=[])
+    mock_client.list_teams = AsyncMock(return_value=[])
+
+    mock_executor = MagicMock()
+    mock_executor.add_hook = MagicMock()
+    mock_executor.execute = AsyncMock(return_value=mock_state)
+
+    with (
+        patch("telemachy.cli.AgamemnonClient", return_value=mock_client),
+        patch("telemachy.cli.WorkflowExecutor", return_value=mock_executor),
+    ):
+        result = runner.invoke(app, ["run", str(workflow_file)])
+
+    result.executor = mock_executor  # type: ignore[attr-defined]
+    return result
+
+
+def test_run_executes_workflow_through_executor(valid_workflow_file: Path) -> None:
+    """run drives the executor and reports completion for a successful workflow."""
+    result = _run_with_mocked_backend(valid_workflow_file, "completed", None)
+
+    assert result.exit_code == 0, result.output
+    result.executor.execute.assert_awaited_once()
+    _args, kwargs = result.executor.execute.call_args
+    assert kwargs["workflow_id"], "run must pass a workflow id to the executor"
+    assert "completed" in result.output.lower()
+
+
+def test_run_exits_1_when_workflow_fails(valid_workflow_file: Path) -> None:
+    """run returns a non-zero exit code and prints the failure details."""
+    result = _run_with_mocked_backend(valid_workflow_file, "failed", "task failed")
+
+    assert result.exit_code == 1, result.output
+    assert "failed" in result.output.lower()
+    assert "task failed" in result.output
+
+
 def test_run_dry_run(valid_workflow_file: Path) -> None:
     """run --dry-run exits 0 without connecting to Agamemnon."""
     mock_state = MagicMock()
