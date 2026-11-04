@@ -67,7 +67,7 @@ See `docs/backwards-compat.md`.
 - Packaging: `__all__` exports in `telemachy.__init__` for a clean public
   API (#53); PEP 561 `py.typed` marker (#45).
 
-### Removed
+### Removed (breaking)
 
 - Local workflow state store (`telemachy.state_store`) and the `status`,
   `list`, and `cancel` CLI commands. Telemachy is a workflow engine driven
