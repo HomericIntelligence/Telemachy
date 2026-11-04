@@ -82,6 +82,10 @@ See `docs/backwards-compat.md`.
 - Prometheus metrics (`setup_metrics`, `METRICS_ENABLED`, `METRICS_PORT`) and
   the `prometheus-client` dependency. ProjectArgus owns mesh observability;
   Telemachy is not a scrape target.
+- `MONITOR_MAX_POLLS` and the `HEALTHCHECK_INTERVAL_SECONDS` /
+  `HEALTHCHECK_FAILURE_THRESHOLD` / `HEALTHCHECK_TIMEOUT_SECONDS` settings.
+  They were retained only so polling-era environments kept parsing; the
+  event-driven monitor bounds itself with `MONITOR_TIMEOUT_SECONDS` alone.
 
 ### Changed
 

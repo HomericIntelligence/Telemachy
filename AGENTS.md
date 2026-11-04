@@ -338,12 +338,8 @@ path that covers permissions, runner labels, and secrets references.
 | `HOST_ID` | `hermes` | Host identifier embedded in Agamemnon task assignments |
 | `REQUIRE_TLS` | `true` | Reject non-TLS Agamemnon connections. Set to `false` to allow cleartext for local dev (logs a WARNING). |
 | `LOG_LEVEL` | `INFO` | Python logging level (DEBUG, INFO, WARNING, ERROR) |
-| `MONITOR_TIMEOUT_SECONDS` | `3600` | Seconds before workflow monitor times out |
-| `MONITOR_MAX_POLLS` | `7200` | Retained for compatibility; the event-driven monitor does not poll. |
+| `MONITOR_TIMEOUT_SECONDS` | `3600` | Seconds before the event-driven workflow monitor times out |
 | `DEFAULT_WORKFLOW_TIMEOUT` | `7200` | Per-workflow execution timeout in seconds |
-| `HEALTHCHECK_INTERVAL_SECONDS` | `15` | Retained for compatibility; the event-driven monitor has no HTTP liveness probe. |
-| `HEALTHCHECK_FAILURE_THRESHOLD` | `2` | Retained for compatibility; see `HEALTHCHECK_INTERVAL_SECONDS`. |
-| `HEALTHCHECK_TIMEOUT_SECONDS` | `5` | Retained for compatibility; see `HEALTHCHECK_INTERVAL_SECONDS`. |
 | `LOG_FORMAT` | `plain` | Log format: `plain` (human-readable, default) or `json` (one JSON object per line) |
 | `OTEL_ENABLED` | `false` | Enable OpenTelemetry tracing when `true` (console exporter only in this release) |
 | `OTEL_SERVICE_NAME` | `telemachy` | Service name for OpenTelemetry resource |

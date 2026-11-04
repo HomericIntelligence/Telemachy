@@ -218,7 +218,7 @@ gh pr create --title "[Type] Brief description" --body "Closes #<issue-number>"
 Telemachy's `main` branch uses an active merge queue. Complete independent review
 and current-head CI before normal queue admission. See
 [`docs/ci/merge-queue.md`](docs/ci/merge-queue.md) to compare live protection with
-the recorded policy and verify all 13 required checks on the actual queue head.
+the recorded policy and verify all 14 required checks on the actual queue head.
 Confirm the queue entry rather than assuming that enabling auto-merge created
 one. Missing checks require investigation and repair; do not weaken protection
 or use an admin bypass.

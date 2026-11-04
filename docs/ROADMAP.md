@@ -22,13 +22,13 @@ Conventions:
 | Secure TLS default (`REQUIRE_TLS=true`) | Shipped | [#158](https://github.com/HomericIntelligence/Telemachy/issues/158) | — |
 | Release workflow (PyPI + GH Release) | Shipped | [#153](https://github.com/HomericIntelligence/Telemachy/issues/153) | — |
 | 75% coverage gate | Shipped | [#152](https://github.com/HomericIntelligence/Telemachy/issues/152) | — |
+| Retire the polling-era settings (`MONITOR_MAX_POLLS`, `HEALTHCHECK_*`) | Shipped | — | [ADR-001](adr/001-http-polling-monitoring.md) |
 
 ## Next Release (v0.2.0)
 
 | Work | Status | Issue | ADR |
 | --- | --- | --- | --- |
 | Roadmap & milestones (this artefact) | In progress | [#167](https://github.com/HomericIntelligence/Telemachy/issues/167) | [ADR-003](adr/003-roadmap-artifact.md) |
-| Retire the polling-era settings retained for compatibility | Planned | _no issue yet — file before starting work_ | — |
 
 ## Future (v1.0.0 and beyond)
 
@@ -43,8 +43,6 @@ Conventions:
   fails closed (`NatsUnavailableError`) when the event bus is unavailable.
 - Fleet registration requires an externally enforced single writer; GitHub
   issue PATCH is not an atomic compare-and-swap.
-- `MONITOR_MAX_POLLS` and the `HEALTHCHECK_*` settings no longer affect
-  behaviour; they are retained so existing environments keep parsing.
 
 ## How to propose a roadmap change
 
