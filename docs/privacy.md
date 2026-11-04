@@ -10,9 +10,9 @@ data out of the data flow.
 ## What text leaves the Telemachy process
 
 The table below reflects Telemachy's current code paths. **Maintenance note:**
-update this table whenever the data flow changes — in particular, the planned
-NATS event subscriber under #92 may introduce new sinks; that PR must revise
-this table.
+update this table whenever the data flow changes — in particular, the
+`NatsMonitor` subscriber consumes Agamemnon's task-lifecycle events; any new
+sink must revise this table.
 
 Line numbers are indicative and may drift; the qualifying method name is
 the stable anchor.

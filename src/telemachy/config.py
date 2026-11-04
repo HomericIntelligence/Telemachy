@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import TypedDict
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -48,12 +48,6 @@ class Settings(BaseSettings):
     healthcheck_timeout_seconds: float = 5.0
     log_level: str = "INFO"
     default_workflow_timeout: float = 7200.0
-    state_dir: Path = Field(
-        default=Path.home() / ".telemachy" / "state",
-        validation_alias=AliasChoices("TELEMACHY_STATE_DIR", "STATE_DIR"),
-    )
-    audit_log_path: str | None = None
-    audit_hash_chain: bool = True
     log_format: str = "plain"
     metrics_enabled: bool = False
     metrics_port: int = 9464

@@ -17,7 +17,6 @@ Conventions:
 | --- | --- | --- | --- |
 | HTTP-polling task monitoring | Superseded by event-driven monitoring | [#92](https://github.com/HomericIntelligence/Telemachy/issues/92) | [ADR-001](adr/001-http-polling-monitoring.md) |
 | NATS subscriber for task-lifecycle events | Shipped | [#92](https://github.com/HomericIntelligence/Telemachy/issues/92) | ADR-001 superseded |
-| Persistent state backend for `status`/`list`/`cancel` | Shipped | [#92](https://github.com/HomericIntelligence/Telemachy/issues/92) | — |
 | Durable Fleet epic registration | Shipped | [#339](https://github.com/HomericIntelligence/Telemachy/issues/339) | — |
 | Agamemnon-exclusive backend | Shipped | — | [ADR-002](adr/002-decouple-from-maestro.md) |
 | Secure TLS default (`REQUIRE_TLS=true`) | Shipped | [#158](https://github.com/HomericIntelligence/Telemachy/issues/158) | — |
@@ -40,8 +39,6 @@ Conventions:
 
 ## Known Limitations
 
-- The `state backend` is local to one host: `status`/`list`/`cancel` read
-  `TELEMACHY_STATE_DIR` and do not query Agamemnon.
 - Task-completion detection requires a reachable NATS broker; the executor
   fails closed (`NatsUnavailableError`) when the event bus is unavailable.
 - Fleet registration requires an externally enforced single writer; GitHub

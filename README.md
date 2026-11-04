@@ -35,11 +35,6 @@ just plan workflows/example.yaml
 just validate workflows/example.yaml
 ```
 
-> **State:** each `run` persists its `WorkflowState` under
-> `TELEMACHY_STATE_DIR` (default `~/.telemachy/state`). `status`, `list`,
-> and `cancel` read that store; `cancel` writes `<id>.cancel`, which the
-> running executor polls.
-
 ## Roadmap
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the canonical roadmap — current,

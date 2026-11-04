@@ -246,25 +246,3 @@ def test_rate_limit_burst_negative_rejected(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("AGAMEMNON_RATE_LIMIT_BURST", "-5")
     with pytest.raises(pydantic.ValidationError):
         Settings(_env_file=None)
-
-
-def test_state_dir_default_under_home(monkeypatch):
-    monkeypatch.delenv("TELEMACHY_STATE_DIR", raising=False)
-    monkeypatch.delenv("STATE_DIR", raising=False)
-    s = Settings(_env_file=None)
-    assert s.state_dir == Path.home() / ".telemachy" / "state"
-
-
-def test_state_dir_documented_env_name_works(monkeypatch, tmp_path):
-    """TELEMACHY_STATE_DIR (the documented name) overrides the default."""
-    monkeypatch.setenv("TELEMACHY_STATE_DIR", str(tmp_path))
-    s = Settings(_env_file=None)
-    assert s.state_dir == tmp_path
-
-
-def test_state_dir_bare_env_name_also_works(monkeypatch, tmp_path):
-    """STATE_DIR (bare, matching AGAMEMNON_URL convention) also overrides."""
-    monkeypatch.delenv("TELEMACHY_STATE_DIR", raising=False)
-    monkeypatch.setenv("STATE_DIR", str(tmp_path))
-    s = Settings(_env_file=None)
-    assert s.state_dir == tmp_path

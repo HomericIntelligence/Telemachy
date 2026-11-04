@@ -67,6 +67,19 @@ See `docs/backwards-compat.md`.
 - Packaging: `__all__` exports in `telemachy.__init__` for a clean public
   API (#53); PEP 561 `py.typed` marker (#45).
 
+### Removed (breaking)
+
+- Local workflow state store (`telemachy.state_store`) and the `status`,
+  `list`, and `cancel` CLI commands. Telemachy is a workflow engine driven
+  programmatically by Agamemnon and Nestor, not a user-facing service;
+  live workflow and task state belongs to ProjectAgamemnon, which remains
+  the system of record for status and cancellation.
+- Audit log (`telemachy.audit`) and the `AUDIT_LOG_PATH` /
+  `AUDIT_HASH_CHAIN` settings. Audit and log aggregation belong to
+  ProjectArgus in the mesh.
+- `WorkflowExecutor(state_writer=..., sink=...)`. The executor returns its
+  final `WorkflowState` from `execute()` and writes no external state.
+
 ### Changed
 
 - pixi: expand `platforms` to `linux-64`, `osx-arm64`, `osx-64`, `win-64`
