@@ -21,8 +21,18 @@ ENGINE = r"""
 import os, pathlib, shutil, sys
 args = sys.argv[1:]
 if args[:2] == ["image", "inspect"]:
+    if os.environ.get("FIXTURE_IMAGE_MISSING") and "--format" not in args:
+        raise SystemExit(1)
     if "--format" in args:
         print("amd64")
+    raise SystemExit(0)
+if args[0] == "login":
+    sys.stdin.read()
+    raise SystemExit(0)
+if args[0] == "pull":
+    if os.environ.get("FIXTURE_PULL_FAIL"):
+        print("fixture pull failure: " + args[1], file=sys.stderr)
+        raise SystemExit(3)
     raise SystemExit(0)
 if args[0] != "run":
     raise SystemExit("unexpected engine operation")
@@ -274,6 +284,25 @@ def test_all_stops_before_later_checks_on_failure(runner: Runner) -> None:
 def test_successful_checks_still_pass(runner: Runner, subset: str) -> None:
     result = runner.run(subset)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_missing_image_is_pulled_from_the_fleet_registry(runner: Runner) -> None:
+    result = runner.run("markdownlint", FIXTURE_IMAGE_MISSING="1")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert runner.tools() == ["markdownlint"]
+
+
+def test_failed_image_pull_fails_before_any_check_runs(runner: Runner) -> None:
+    result = runner.run("markdownlint", FIXTURE_IMAGE_MISSING="1", FIXTURE_PULL_FAIL="1")
+    assert result.returncode != 0, result.stdout
+    assert "fixture pull failure" in result.stderr
+    assert runner.tools() == []
+
+
+def test_required_workflow_pulls_the_image_instead_of_building_it() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "_required.yml").read_text()
+    assert "podman build" not in workflow
+    assert "run_ci_local.sh" in workflow
 
 
 def test_secrets_scan_requests_redacted_sarif_without_success_override(runner: Runner) -> None:

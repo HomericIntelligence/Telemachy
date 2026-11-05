@@ -3,8 +3,7 @@
 #
 # Host `just` older than 1.31 rejects the `[positional-arguments]` attribute, so
 # `just --evaluate` (the local `justfile-check` gate) cannot run there. This
-# helper reuses an existing CI image that already carries a capable toolchain
-# rather than building or pulling anything.
+# helper reuses the published Telemachy CI image rather than building one.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,12 +22,25 @@ if [ -z "${CONTAINER_ENGINE:-}" ]; then
 fi
 command -v "${CONTAINER_ENGINE}" >/dev/null
 
-# An explicit image is authoritative; otherwise reuse the declared CI image and
-# the fleet CI image that developers already have on disk.
+# An explicit image is authoritative; otherwise prefer the local development
+# image, then the artifact AchaeanFleet publishes, then the fleet CI image.
 if [ -n "${TELEMACHY_JUST_IMAGE:-}" ]; then
     images=("${TELEMACHY_JUST_IMAGE}")
 else
-    images=("telemachy-ci:local" "localhost/hephaestus-ci:verify")
+    images=("telemachy-ci:local" "${TELEMACHY_CI_IMAGE:-ghcr.io/homericintelligence/achaean-telemachy-ci:ci}" "localhost/hephaestus-ci:verify")
+fi
+
+if [ -z "${TELEMACHY_JUST_IMAGE:-}" ]; then
+    published="${TELEMACHY_CI_IMAGE:-ghcr.io/homericintelligence/achaean-telemachy-ci:ci}"
+    if ! "${CONTAINER_ENGINE}" image inspect "${published}" >/dev/null 2>&1; then
+        token="${GHCR_TOKEN:-${GITHUB_TOKEN:-}}"
+        if [ -n "${token}" ]; then
+            printf '%s\n' "${token}" | "${CONTAINER_ENGINE}" login ghcr.io \
+                --username "${GHCR_ACTOR:-${GITHUB_ACTOR:-git}}" --password-stdin >/dev/null
+        fi
+        "${CONTAINER_ENGINE}" pull "${published}" >/dev/null 2>&1 \
+            || echo "Could not pull ${published}; falling back to a local image." >&2
+    fi
 fi
 
 selected=
@@ -49,7 +61,7 @@ done
 
 if [ -z "${selected}" ]; then
     echo "No local image with just >= ${MINIMUM_JUST}: ${images[*]}" >&2
-    echo "Build one with 'just ci-build' or set TELEMACHY_JUST_IMAGE." >&2
+    echo "Pull one with 'just ci-pull' or set TELEMACHY_JUST_IMAGE." >&2
     exit 1
 fi
 

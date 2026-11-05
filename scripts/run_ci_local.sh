@@ -1,12 +1,12 @@
 #!/bin/bash
-# Local and hosted checks share ci/checks.py and the same declared CI image.
-# Build it first with just ci-build. The default subset runs every check.
+# Local and hosted checks share ci/checks.py and the fleet CI image published
+# by AchaeanFleet. The default subset runs every check.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SUBSET="${1:-all}"
-IMAGE="telemachy-ci:local"
+IMAGE="${TELEMACHY_CI_IMAGE:-ghcr.io/homericintelligence/achaean-telemachy-ci:ci}"
 
 if [ -z "${CONTAINER_ENGINE:-}" ]; then
     if command -v podman >/dev/null; then
@@ -19,10 +19,29 @@ if [ -z "${CONTAINER_ENGINE:-}" ]; then
     fi
 fi
 command -v "${CONTAINER_ENGINE}" >/dev/null
-if ! "${CONTAINER_ENGINE}" image inspect "${IMAGE}" >/dev/null; then
-    echo "Image ${IMAGE} is missing; run just ci-build." >&2
-    exit 1
+
+# The image is built, verified, and published by AchaeanFleet. A missing local
+# copy is pulled once; an unauthenticated pull works for the public package.
+pull_image() {
+    if "${CONTAINER_ENGINE}" image inspect "${IMAGE}" >/dev/null 2>&1; then
+        return
+    fi
+    token="${GHCR_TOKEN:-${GITHUB_TOKEN:-}}"
+    if [ -n "${token}" ]; then
+        printf '%s\n' "${token}" | "${CONTAINER_ENGINE}" login ghcr.io \
+            --username "${GHCR_ACTOR:-${GITHUB_ACTOR:-git}}" \
+            --password-stdin >/dev/null
+    fi
+    "${CONTAINER_ENGINE}" pull "${IMAGE}"
+}
+
+if [ "${SUBSET}" = "pull" ]; then
+    pull_image
+    echo "Using ${IMAGE}"
+    exit 0
 fi
+pull_image
+
 architecture=$("${CONTAINER_ENGINE}" image inspect --format '{{.Architecture}}' "${IMAGE}")
 case "${architecture}" in
     amd64|arm64) ;;

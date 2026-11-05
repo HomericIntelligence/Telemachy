@@ -88,21 +88,11 @@ fleet-native-contract native broker output python='python3':
 
 # === Containerized CI (see docs/ci/local-ci.md) ===
 
-# Build the CI image with one selected engine; failed builds remain failures.
-ci-build:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    engine="${CONTAINER_ENGINE:-}"
-    if [ -z "$engine" ]; then
-        if command -v podman >/dev/null; then engine=podman; else engine=docker; fi
-    fi
-    if [ "$(basename "$engine")" = podman ]; then
-        "$engine" build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-    else
-        "$engine" build -f ci/Containerfile -t telemachy-ci:local .
-    fi
+# Pull the CI image AchaeanFleet publishes for Telemachy's checks.
+ci-pull:
+    ./scripts/run_ci_local.sh pull
 
-# Run every CI check in the declared CI image. Individual subsets:
+# Run every CI check in the published CI image. Individual subsets:
 #   ./scripts/run_ci_local.sh <subset>
 ci-all:
     ./scripts/run_ci_local.sh all

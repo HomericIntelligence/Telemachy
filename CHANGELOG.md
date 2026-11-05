@@ -90,6 +90,11 @@ See `docs/backwards-compat.md`.
 
 ### Changed
 
+- CI: the Telemachy CI image is now owned, built, and published by
+  AchaeanFleet (`ci/telemachy/`) as
+  `ghcr.io/homericintelligence/achaean-telemachy-ci`. Required jobs and the
+  local runner pull the published image instead of rebuilding it, and
+  `just ci-build` is replaced by `just ci-pull`.
 - Packaging: declare runtime dependencies in `pyproject.toml` so the
   documented `pip install` paths produce a working package; the install
   gate now verifies the wheel's own metadata.
