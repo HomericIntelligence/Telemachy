@@ -94,7 +94,9 @@ See `docs/backwards-compat.md`.
   AchaeanFleet (`ci/telemachy/`) as
   `ghcr.io/homericintelligence/achaean-telemachy-ci`. Required jobs and the
   local runner pull the published image instead of rebuilding it, and
-  `just ci-build` is replaced by `just ci-pull`.
+  `just ci-build` is replaced by `just ci-pull`. The package is public, so
+  jobs pull it anonymously exactly as contributors do; AchaeanFleet's publish
+  job fails unless an anonymous client can resolve `:ci`.
 - Packaging: declare runtime dependencies in `pyproject.toml` so the
   documented `pip install` paths produce a working package; the install
   gate now verifies the wheel's own metadata.

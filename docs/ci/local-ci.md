@@ -51,9 +51,11 @@ bash scripts/run_ci_local.sh lint
 ```
 
 `TELEMACHY_CI_IMAGE` overrides the reference entirely, for example to test a
-`git-<sha>` tag before it reaches `:ci`. `GHCR_TOKEN` with `GHCR_ACTOR`
-authenticates the pull; unauthenticated pulls work because the package is
-public, and hosted jobs pass their workflow token.
+`git-<sha>` tag before it reaches `:ci`. Pulls are anonymous: AchaeanFleet's
+publish job makes the package public and proves an anonymous GHCR client can
+resolve `:ci` and `:git-<sha>`, so required jobs and contributors pull the same
+way. `GHCR_TOKEN` with `GHCR_ACTOR` exists only for an override image hosted in
+a private registry.
 
 ## Host `just` older than the justfile
 

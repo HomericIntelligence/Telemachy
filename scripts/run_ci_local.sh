@@ -32,7 +32,11 @@ pull_image() {
             --username "${GHCR_ACTOR:-${GITHUB_ACTOR:-git}}" \
             --password-stdin >/dev/null
     fi
-    "${CONTAINER_ENGINE}" pull "${IMAGE}"
+    "${CONTAINER_ENGINE}" pull "${IMAGE}" || {
+        echo "Could not pull ${IMAGE}." >&2
+        echo "AchaeanFleet publishes this package publicly; see its telemachy-ci workflow." >&2
+        exit 1
+    }
 }
 
 if [ "${SUBSET}" = "pull" ]; then
