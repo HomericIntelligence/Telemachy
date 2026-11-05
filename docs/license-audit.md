@@ -8,13 +8,14 @@ runtime dependencies to confirm distribution compatibility.
 
 2026-05-16 (initial)
 2026-06-04 (added issue #163 observability packages)
-2026-11-04 (removed the metrics subsystem and `prometheus-client`)
+2026-11-04 (removed the metrics subsystem, `prometheus-client`, and unused
+`cryptography`)
 
 ## Method
 
-1. Enumerate runtime dependencies from `pixi.toml`
-   `[pypi-dependencies]` (the authoritative declaration; `pyproject.toml`
-   carries no runtime `dependencies` table — see `pyproject.toml:5-11`).
+1. Enumerate runtime dependencies from `pyproject.toml`
+   `[project.dependencies]` (the wheel metadata contract) and cross-check
+   them against `pixi.toml` `[pypi-dependencies]` (the dev environment).
 2. Resolve each dependency's declared license from its PyPI metadata.
 3. Compare each license against the BSD-3-Clause distribution model —
    permissive licenses (MIT, BSD, ISC, Apache 2.0) are compatible;
@@ -34,7 +35,6 @@ runtime dependencies to confirm distribution compatibility.
 | `opentelemetry-api` | Apache-2.0 | yes |
 | `opentelemetry-sdk` | Apache-2.0 | yes |
 | `opentelemetry-instrumentation-httpx` | Apache-2.0 | yes |
-| `cryptography` | Apache-2.0 / BSD-3-Clause | yes |
 | `nats-py` | Apache-2.0 | yes |
 
 All declared runtime dependencies are permissively licensed and

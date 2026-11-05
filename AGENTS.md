@@ -294,6 +294,7 @@ just lint                          # ruff check
 just format                        # ruff format
 just bandit                        # SAST scan (medium+ severity) on src/telemachy
 just check                         # lint + mypy + bandit + test
+bash scripts/just_container.sh     # just --evaluate via a CI image (host just may be too old)
 just fleet-register reviewed.yaml --repo OWNER/REPO --epic-issue 42 \
   --registration-key reviewed-idea --dry-run  # offline Fleet registration preview
 ```

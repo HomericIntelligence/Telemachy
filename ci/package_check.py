@@ -39,23 +39,13 @@ def install() -> None:
     if len(wheels) != 1:
         raise ValueError("The install check requires exactly one built wheel in dist")
     wheel = wheels[0].resolve()
-    manifest = tomllib.loads(Path("pixi.toml").read_text())
-    requirements = []
-    for name, spec in manifest["pypi-dependencies"].items():
-        if name == "telemachy":
-            continue
-        version = spec if isinstance(spec, str) else spec.get("version", "*")
-        requirements.append(name if version in {"*", "", None} else f"{name}{version}")
     with tempfile.TemporaryDirectory(prefix="telemachy-install-") as directory:
         root = Path(directory)
         venv.EnvBuilder(with_pip=True).create(root / "venv")
         python = str(root / "venv" / "bin" / "python")
-        # Match the supported pixi-managed consumption contract: runtime
-        # dependencies are declared in pixi.toml, outside wheel metadata.
-        subprocess.run([python, "-m", "pip", "install", *requirements], cwd=root, check=True)
-        subprocess.run(
-            [python, "-m", "pip", "install", "--no-deps", str(wheel)], cwd=root, check=True
-        )
+        # Install from the wheel alone: its Requires-Dist metadata must carry
+        # every runtime dependency, exactly as `pip install telemachy` would.
+        subprocess.run([python, "-m", "pip", "install", str(wheel)], cwd=root, check=True)
         subprocess.run(
             [
                 python,

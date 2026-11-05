@@ -14,6 +14,17 @@ concurrency:
   group: required-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: read
+
+# The CI image is a private package: organization policy forbids public
+# container packages. Every job that pulls it authenticates with this
+# credential, declared once here instead of repeated in each job.
+env:
+  GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+  GHCR_ACTOR: ${{ github.actor }}
+
 jobs:
 
   forbid-suppressions:
@@ -35,18 +46,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh lint`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: lint (in container)
         run: bash scripts/run_ci_local.sh lint
 
@@ -59,18 +60,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh markdownlint`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: markdownlint (in container)
         run: bash scripts/run_ci_local.sh markdownlint
 
@@ -83,18 +74,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh pixi-check`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: pixi-check (in container)
         run: bash scripts/run_ci_local.sh pixi-check
 
@@ -107,18 +88,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh justfile-check`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: justfile-check (in container)
         run: bash scripts/run_ci_local.sh justfile-check
 
@@ -131,18 +102,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh symlink-check`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: symlink-check (in container)
         run: bash scripts/run_ci_local.sh symlink-check
 
@@ -155,18 +116,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh unit-tests`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: unit-tests (in container)
         run: bash scripts/run_ci_local.sh unit-tests
 
@@ -179,18 +130,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh integration-tests`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: integration-tests (in container)
         run: bash scripts/run_ci_local.sh integration-tests
 
@@ -213,24 +154,15 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      packages: read
       security-events: write  # trivy SARIF upload needs code-scanning write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh security-dependency-scan`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: security-dependency-scan (in container)
         run: bash scripts/run_ci_local.sh security-dependency-scan
 
@@ -240,22 +172,13 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      packages: read
       security-events: write  # gitleaks SARIF upload needs code-scanning write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
       - name: Run Gitleaks
         run: bash scripts/run_ci_local.sh security-secrets-scan
 
@@ -369,18 +292,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh schema-validation`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: schema-validation (in container)
         run: bash scripts/run_ci_local.sh schema-validation
 
@@ -393,17 +306,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Cache podman container storage
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ~/.local/share/containers/storage
-          key: podman-telemachy-${{ runner.os }}-${{ hashFiles('pixi.toml', 'pixi.lock') }}
-          restore-keys: |
-            podman-telemachy-${{ runner.os }}-
-
-      - name: Build CI image (podman)
-        run: podman build --ignorefile ci/.dockerignore -f ci/Containerfile -t telemachy-ci:local .
-      # All checks run inside the CI container — the same image developers
-      # use via `bash scripts/run_ci_local.sh deps-version-sync`.
+      # Checks run inside the CI image AchaeanFleet publishes; the runner
+      # pulls it on first use and executes the selected subset.
       - name: deps-version-sync (in container)
         run: bash scripts/run_ci_local.sh deps-version-sync

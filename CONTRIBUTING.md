@@ -3,7 +3,8 @@
 Thank you for your interest in contributing to Telemachy! This is the workflow
 execution engine for the [HomericIntelligence](https://github.com/HomericIntelligence)
 distributed agent mesh — it runs, plans, and monitors named workflow YAML files
-against Agamemnon's REST API. (A NATS-based event channel is planned — see issue #92 — but is not yet wired up.)
+against Agamemnon's REST API, tracking completion from Agamemnon's NATS
+task-lifecycle events.
 
 For an overview of the full ecosystem, see the
 [Odysseus](https://github.com/HomericIntelligence/Odysseus) meta-repo.
@@ -21,8 +22,7 @@ For an overview of the full ecosystem, see the
 
 Planning lives in [`docs/ROADMAP.md`](docs/ROADMAP.md). Cross-cutting
 work is bucketed into milestones (`v0.1.0`, `v0.2.0`, `v1.0.0`) and
-tagged with the `roadmap`, `nats-subscriber`, or `state-backend`
-labels. Open an issue with label `roadmap` to propose a change before
+tagged with the `roadmap` or `nats-subscriber` labels. Open an issue with label `roadmap` to propose a change before
 sending a PR that alters planned scope.
 
 ## Development Setup
@@ -153,12 +153,16 @@ just test
 
 ### Reproduce the required CI gates
 
-Run `just ci-build`, then `just ci-all` for the bounded Linux container suite.
-The local runner and hosted jobs use the same check implementations, including
-Markdown, dependency audits, packaging, installed-wheel checks, and release
-validation. The release check does not publish anything. See
-[the CI runbook](docs/ci/local-ci.md) for tool pins, individual subsets, and
-environment storage.
+Run `just ci-all` for the bounded Linux container suite. The runner pulls the
+Telemachy CI image that AchaeanFleet builds and publishes
+(`ghcr.io/homericintelligence/achaean-telemachy-ci:ci`), so no local image build
+is required. The package is private because organization policy forbids public
+container packages, so export `GHCR_TOKEN` with `read:packages` before the first
+pull. The local runner and hosted jobs use the same check
+implementations, including Markdown, dependency audits, packaging,
+installed-wheel checks, and release validation. The release check does not
+publish anything. See [the CI runbook](docs/ci/local-ci.md) for the image
+contract, individual subsets, and environment storage.
 
 ### Lint and Format
 
@@ -218,7 +222,7 @@ gh pr create --title "[Type] Brief description" --body "Closes #<issue-number>"
 Telemachy's `main` branch uses an active merge queue. Complete independent review
 and current-head CI before normal queue admission. See
 [`docs/ci/merge-queue.md`](docs/ci/merge-queue.md) to compare live protection with
-the recorded policy and verify all 14 required checks on the actual queue head.
+the recorded policy and verify all 18 required checks on the actual queue head.
 Confirm the queue entry rather than assuming that enabling auto-merge created
 one. Missing checks require investigation and repair; do not weaken protection
 or use an admin bypass.
