@@ -14,12 +14,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
 ENGINE = r"""
 import os, pathlib, shutil, sys
 args = sys.argv[1:]
+if args and args[0] in ("login", "pull") and os.environ.get("FIXTURE_ENGINE_CALLS"):
+    with open(os.environ["FIXTURE_ENGINE_CALLS"], "a") as file:
+        file.write(args[0] + "\n")
 if args[:2] == ["image", "inspect"]:
     if os.environ.get("FIXTURE_IMAGE_MISSING") and "--format" not in args:
         raise SystemExit(1)
@@ -296,7 +300,32 @@ def test_failed_image_pull_fails_before_any_check_runs(runner: Runner) -> None:
     result = runner.run("markdownlint", FIXTURE_IMAGE_MISSING="1", FIXTURE_PULL_FAIL="1")
     assert result.returncode != 0, result.stdout
     assert "fixture pull failure" in result.stderr
+    assert "GHCR_TOKEN" in result.stderr
     assert runner.tools() == []
+
+
+def test_pull_authenticates_before_downloading_the_private_image(
+    runner: Runner, tmp_path: Path
+) -> None:
+    operations = tmp_path / "engine-operations"
+    result = runner.run(
+        "markdownlint",
+        FIXTURE_IMAGE_MISSING="1",
+        FIXTURE_ENGINE_CALLS=str(operations),
+        GHCR_TOKEN="read-packages-credential",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert operations.read_text().split() == ["login", "pull"]
+
+
+def test_required_workflow_declares_the_pull_credential_once() -> None:
+    source = (ROOT / ".github" / "workflows" / "_required.yml").read_text()
+    workflow = yaml.safe_load(source)
+    assert workflow["env"] == {
+        "GHCR_TOKEN": "${{ secrets.GHCR_TOKEN }}",
+        "GHCR_ACTOR": "${{ github.actor }}",
+    }
+    assert source.count("secrets.GHCR_TOKEN") == 1
 
 
 def test_required_workflow_pulls_the_image_instead_of_building_it() -> None:

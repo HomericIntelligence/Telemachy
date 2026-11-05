@@ -11,7 +11,8 @@ this repository consumes the published artifact and does not build it.
 
 1. Install Podman or Docker. The image already carries Pixi, Just, Gitleaks,
    NATS Server, Markdownlint CLI2, and npm, so no other host tooling is needed.
-2. Run `just ci-all`. The runner pulls
+2. Export a pull credential once, then run `just ci-all`: see
+   [Pull credentials](#pull-credentials). The runner pulls
    `ghcr.io/homericintelligence/achaean-telemachy-ci:ci` on first use, then
    uses two CPUs, 4 GiB of memory, and a 512-process ceiling by default.
    `TELEMACHY_CI_CPUS` and `TELEMACHY_CI_MEMORY` set explicit operator budgets.
@@ -51,11 +52,28 @@ bash scripts/run_ci_local.sh lint
 ```
 
 `TELEMACHY_CI_IMAGE` overrides the reference entirely, for example to test a
-`git-<sha>` tag before it reaches `:ci`. Pulls are anonymous: AchaeanFleet's
-publish job makes the package public and proves an anonymous GHCR client can
-resolve `:ci` and `:git-<sha>`, so required jobs and contributors pull the same
-way. `GHCR_TOKEN` with `GHCR_ACTOR` exists only for an override image hosted in
-a private registry.
+`git-<sha>` tag before it reaches `:ci`.
+
+### Pull credentials
+
+The package is private. Organization policy forbids public container
+packages, so no anonymous client can read it and no workflow or operator can
+change that. CI owns access instead:
+
+- Hosted required jobs read the repository `GHCR_TOKEN` secret, declared once
+  at workflow level in `.github/workflows/_required.yml`.
+- AchaeanFleet stores the same credential as `TELEMACHY_GHCR_TOKEN` and fails
+  its publish unless that credential resolves `:ci` and `:git-<sha>`.
+- Locally, export a classic personal access token with `read:packages`:
+
+```bash
+export GHCR_TOKEN=<token>
+```
+
+`GHCR_ACTOR` overrides the registry username, which defaults to `git`. A pull
+without a credential fails before any check runs and names the missing
+variable. Fork pull requests receive no secrets, so their jobs cannot pull the
+image; run the suite from a branch in this repository or locally instead.
 
 ## Host `just` older than the justfile
 

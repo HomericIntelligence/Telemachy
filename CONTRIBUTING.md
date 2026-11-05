@@ -156,7 +156,9 @@ just test
 Run `just ci-all` for the bounded Linux container suite. The runner pulls the
 Telemachy CI image that AchaeanFleet builds and publishes
 (`ghcr.io/homericintelligence/achaean-telemachy-ci:ci`), so no local image build
-is required. The local runner and hosted jobs use the same check
+is required. The package is private because organization policy forbids public
+container packages, so export `GHCR_TOKEN` with `read:packages` before the first
+pull. The local runner and hosted jobs use the same check
 implementations, including Markdown, dependency audits, packaging,
 installed-wheel checks, and release validation. The release check does not
 publish anything. See [the CI runbook](docs/ci/local-ci.md) for the image

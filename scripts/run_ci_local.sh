@@ -21,20 +21,20 @@ fi
 command -v "${CONTAINER_ENGINE}" >/dev/null
 
 # The image is built, verified, and published by AchaeanFleet. A missing local
-# copy is pulled once; an unauthenticated pull works for the public package.
+# copy is pulled once with GHCR_TOKEN. The package is private: organization
+# policy forbids public container packages, so anonymous pulls cannot work.
 pull_image() {
     if "${CONTAINER_ENGINE}" image inspect "${IMAGE}" >/dev/null 2>&1; then
         return
     fi
-    token="${GHCR_TOKEN:-${GITHUB_TOKEN:-}}"
-    if [ -n "${token}" ]; then
-        printf '%s\n' "${token}" | "${CONTAINER_ENGINE}" login ghcr.io \
-            --username "${GHCR_ACTOR:-${GITHUB_ACTOR:-git}}" \
-            --password-stdin >/dev/null
+    if [ -n "${GHCR_TOKEN:-}" ]; then
+        printf '%s\n' "${GHCR_TOKEN}" | "${CONTAINER_ENGINE}" login ghcr.io \
+            --username "${GHCR_ACTOR:-git}" --password-stdin >/dev/null
     fi
     "${CONTAINER_ENGINE}" pull "${IMAGE}" || {
         echo "Could not pull ${IMAGE}." >&2
-        echo "AchaeanFleet publishes this package publicly; see its telemachy-ci workflow." >&2
+        echo "The package is private because organization policy forbids public" >&2
+        echo "container packages; pulls need GHCR_TOKEN with read:packages." >&2
         exit 1
     }
 }

@@ -33,13 +33,12 @@ fi
 if [ -z "${TELEMACHY_JUST_IMAGE:-}" ]; then
     published="${TELEMACHY_CI_IMAGE:-ghcr.io/homericintelligence/achaean-telemachy-ci:ci}"
     if ! "${CONTAINER_ENGINE}" image inspect "${published}" >/dev/null 2>&1; then
-        token="${GHCR_TOKEN:-${GITHUB_TOKEN:-}}"
-        if [ -n "${token}" ]; then
-            printf '%s\n' "${token}" | "${CONTAINER_ENGINE}" login ghcr.io \
-                --username "${GHCR_ACTOR:-${GITHUB_ACTOR:-git}}" --password-stdin >/dev/null
+        if [ -n "${GHCR_TOKEN:-}" ]; then
+            printf '%s\n' "${GHCR_TOKEN}" | "${CONTAINER_ENGINE}" login ghcr.io \
+                --username "${GHCR_ACTOR:-git}" --password-stdin >/dev/null
         fi
         "${CONTAINER_ENGINE}" pull "${published}" >/dev/null 2>&1 \
-            || echo "Could not pull ${published}; falling back to a local image." >&2
+            || echo "Could not pull ${published} (private package: export GHCR_TOKEN); falling back to a local image." >&2
     fi
 fi
 

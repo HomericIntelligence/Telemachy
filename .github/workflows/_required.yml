@@ -18,6 +18,13 @@ permissions:
   contents: read
   packages: read
 
+# The CI image is a private package: organization policy forbids public
+# container packages. Every job that pulls it authenticates with this
+# credential, declared once here instead of repeated in each job.
+env:
+  GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+  GHCR_ACTOR: ${{ github.actor }}
+
 jobs:
 
   forbid-suppressions:
