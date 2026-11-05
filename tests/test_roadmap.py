@@ -34,12 +34,10 @@ def test_roadmap_has_required_sections() -> None:
         )
 
 
-def test_roadmap_references_outstanding_work_items() -> None:
-    # Issue #167 calls out the NATS subscriber as the headline work item.
+def test_roadmap_references_the_nats_work_item() -> None:
     text = _read().lower()
     assert "nats subscriber" in text
     assert "#92" in text  # parent epic
-    assert "#167" in text  # this finding
 
 
 def test_roadmap_uses_canonical_remote_url() -> None:

@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowTimeoutError(Exception):
-    """Raised when workflow monitoring exceeds the configured timeout or max poll count."""
+    """Raised when a workflow exceeds its configured execution timeout."""
 
 
 class WorkflowConnectivityError(Exception):

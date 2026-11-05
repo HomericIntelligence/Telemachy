@@ -86,9 +86,16 @@ See `docs/backwards-compat.md`.
   `HEALTHCHECK_FAILURE_THRESHOLD` / `HEALTHCHECK_TIMEOUT_SECONDS` settings.
   They were retained only so polling-era environments kept parsing; the
   event-driven monitor bounds itself with `MONITOR_TIMEOUT_SECONDS` alone.
+- The unused `cryptography` runtime dependency.
 
 ### Changed
 
+- Packaging: declare runtime dependencies in `pyproject.toml` so the
+  documented `pip install` paths produce a working package; the install
+  gate now verifies the wheel's own metadata.
+- CI: promote `forbid-suppressions`, `justfile-check`, `markdownlint`,
+  `pixi-check`, and `symlink-check` to required merge-queue contexts
+  (18 total).
 - pixi: expand `platforms` to `linux-64`, `osx-arm64`, `osx-64`, `win-64`
   so contributors and operators on macOS and Windows can run
   `pixi install` (#180).

@@ -12,25 +12,30 @@ real required checks preserves the current protection. The separate
 ## Current policy and check mapping
 
 [`configs/github/merge-queue-policy.json`](../../configs/github/merge-queue-policy.json)
-records the 14 required contexts and queue settings observed on 2026-09-12.
-`markdownlint` was added to the live required contexts on 2026-11-04 after a
-link-check failure merged through the queue while the check was advisory.
+records the 18 required contexts and queue settings observed on 2026-09-12 and
+expanded on 2026-11-04. `markdownlint` was added to the live required contexts
+after a link-check failure merged through the queue while the check was
+advisory; the rest of the former advisories followed.
 Re-read live protection before each acceptance run; stop on any mismatch.
 
 | Required context | Job in `_required.yml` | Gate |
 | --- | --- | --- |
 | `build` | `build` | Build the Python distributions |
 | `deps/version-sync` | `deps-version-sync` | Verify all version declarations |
+| `forbid-suppressions` | `forbid-suppressions` | Reject silent-failure suppressions |
 | `install` | `install` | Install the wheel in an isolated environment |
 | `integration-tests` | `integration-tests` | Run integration tests |
+| `justfile-check` | `justfile-check` | Evaluate the justfile |
 | `lint` | `lint` | Run language and configuration lint |
 | `markdownlint` | `markdownlint` | Validate tracked Markdown |
 | `package` | `package` | Validate distribution metadata |
+| `pixi-check` | `pixi-check` | Install the locked pixi environment |
 | `release` | `release` | Check version and changelog; no publication |
 | `schema-validation` | `schema-validation` | Validate configuration syntax |
 | `security/dependency-scan` | `security-dependency-scan` | Audit provisioned dependencies |
 | `security/sast-scan` | `security-sast-scan` | Run the configured Bandit policy |
 | `security/secrets-scan` | `security-secrets-scan` | Run blocking, redacted Gitleaks |
+| `symlink-check` | `symlink-check` | Reject broken tracked symlinks |
 | `test` | `test` | Require both unit and integration jobs |
 | `unit-tests` | `unit-tests` | Run unit tests and coverage |
 
@@ -44,7 +49,7 @@ The live queue uses squash and `HEADGREEN`, with at most two entries building
 concurrently and up to five entries merging together. It can form a group with
 one entry after five minutes; required checks have 60 minutes to report.
 `HEADGREEN` evaluates the group head's required checks. This does not reduce or
-replace the 14 required contexts. Each CI container defaults to two CPUs, 4 GiB
+replace the 18 required contexts. Each CI container defaults to two CPUs, 4 GiB
 of memory and 512 processes; workflow jobs retain their bounded timeouts.
 
 ## Verify a designated queued change
@@ -56,7 +61,7 @@ of memory and 512 processes; workflow jobs retain their bounded timeouts.
    normal expected-head queue path. The commands below observe an existing
    entry; they do not enqueue or merge it.
 4. Bind the selected run to that entry's enqueue time and queue-head SHA. Wait
-   for all 13 actual contexts, not only the fast advisory smoke job.
+   for all 18 actual contexts, not only the fast advisory smoke job.
 5. Preserve the raw rules, queue entry, workflow run and job/check responses.
    Record failure or non-completion honestly; a configuration test cannot prove
    that GitHub scheduled or passed a real queue run.
@@ -213,9 +218,9 @@ jq -e --arg queue_head_sha "${QUEUE_HEAD_SHA}" '
 The selected run is tied to the designated smoke pull request through its merge
 queue entry, actual enqueue time, and exact queue head SHA. The job query then
 follows that run's `check_run_url` values. Both the required job names and their
-check-run names must equal the 14-context artifact exactly, without missing or
+check-run names must equal the 18-context artifact exactly, without missing or
 duplicate required contexts, and every required job and check run must finish
-successfully. Additional advisory jobs may run but are not policy contexts.
+successfully. No advisory jobs remain in `_required.yml`.
 
 Do not remove or rename any required context to make a queued change pass. The queue rule
 does not carry a separate check list; it relies on the existing

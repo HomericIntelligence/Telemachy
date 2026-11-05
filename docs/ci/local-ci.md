@@ -18,6 +18,24 @@
    use private copied repositories and controlled external commands. They do
    not execute an engine or replace the actual Linux suite.
 
+## Host `just` older than the justfile
+
+`justfile-check` evaluates the task file with the image's pinned Just 1.51.0. A
+host whose `just` predates the `[positional-arguments]` attribute (older than
+1.31) cannot parse the justfile at all, so neither `just --evaluate` nor any
+recipe runs. Use the container copy instead of upgrading the host binary:
+
+```bash
+bash scripts/just_container.sh             # same as --evaluate
+bash scripts/just_container.sh --list
+```
+
+The helper probes `telemachy-ci:local` first and then a prebuilt
+`localhost/hephaestus-ci:verify` fleet CI image, accepting the first one whose
+`just --version` is at least 1.31. It never builds or pulls an image.
+`TELEMACHY_JUST_IMAGE` selects an explicit image, and `CONTAINER_ENGINE` selects
+Podman or Docker, as in `scripts/run_ci_local.sh`.
+
 ## Shared checks
 
 `ci/checks.py` is the canonical check implementation. Container-backed hosted

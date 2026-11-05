@@ -24,12 +24,14 @@ all four are exercised in CI.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install --upgrade pip
-pip install -e .[dev]
+pip install -e .
 ```
 
 Use this when you cannot install `pixi` (e.g., on a restricted host).
-You are responsible for matching the Python and dependency versions
-declared in `pyproject.toml`; CI does not run this path.
+Runtime dependencies come from `pyproject.toml`. The test and lint
+toolchain is declared in `pixi.toml` under
+`[feature.dev.pypi-dependencies]`; install those tools into the venv
+yourself or use `pixi install`. CI does not run this path.
 
 ### 3. `pip install` from a release tag (operator)
 

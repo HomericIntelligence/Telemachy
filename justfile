@@ -61,6 +61,10 @@ format:
 # Run the full local CI suite: lint, mypy, bandit, tests
 check: lint mypy bandit test
 
+# Evaluate the justfile with the CI image's just (host just may be too old).
+justfile-check:
+    ./scripts/just_container.sh --evaluate
+
 # Focused checks in an explicitly provisioned environment; never runs a solver.
 fleet-registration-test python='python3':
     {{python}} -m pytest tests/test_fleet_registration.py tests/test_fleet_github.py tests/test_fleet_cli.py -q

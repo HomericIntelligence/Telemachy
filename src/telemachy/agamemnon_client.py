@@ -220,7 +220,8 @@ class AgamemnonClient:
         probe costs at most *timeout* seconds. Wrapping ping() in 3 retries
         with exponential backoff would swallow up to ~7s of connectivity loss
         per probe and defeat the purpose of an out-of-band liveness signal.
-        Callers that want retries or a failure threshold own that loop.
+        It is a diagnostic probe only; mid-workflow connectivity is detected
+        by ``WorkflowExecutor`` through the NATS monitor.
         """
         try:
             resp = await self._http.request("GET", "/v1/agents", timeout=timeout)
