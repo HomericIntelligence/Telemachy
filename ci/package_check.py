@@ -13,7 +13,7 @@ import venv
 from pathlib import Path
 
 
-def release() -> None:
+def release(expected_tag: str | None = None) -> None:
     project = tomllib.loads(Path("pyproject.toml").read_text())
     version = project["project"]["version"]
     init_version = None
@@ -24,8 +24,13 @@ def release() -> None:
             init_version = ast.literal_eval(node.value)
     if version != init_version:
         raise ValueError("pyproject.toml and __init__.py versions disagree")
+    if expected_tag is not None and expected_tag != version:
+        raise ValueError(f"tag {expected_tag} does not match declared version {version}")
+    # A tagged release must have its own section; the dry-run on main may stage
+    # the Unreleased block instead.
+    headings = f"{re.escape(version)}" if expected_tag is not None else rf"Unreleased|{re.escape(version)}"
     section = re.search(
-        rf"^## \[(?:Unreleased|{re.escape(version)})\][^\n]*\n(.*?)(?=^## \[|\Z)",
+        rf"^## \[(?:{headings})\][^\n]*\n(.*?)(?=^## \[|\Z)",
         Path("CHANGELOG.md").read_text(),
         re.MULTILINE | re.DOTALL,
     )
@@ -62,9 +67,17 @@ def install() -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("check", choices=("install", "release"))
+    parser.add_argument(
+        "--tag",
+        default=None,
+        help="release version taken from the pushed tag; must match the declared version",
+    )
     args = parser.parse_args()
     try:
-        (install if args.check == "install" else release)()
+        if args.check == "install":
+            install()
+        else:
+            release(args.tag)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print(f"Package check failed: {error}", file=sys.stderr)
         return 1

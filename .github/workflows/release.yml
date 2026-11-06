@@ -11,20 +11,23 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
+
+# Release verification and building execute in the same fleet CI image as the
+# required checks, so a tagged build uses the toolchain that passed the queue.
+env:
+  GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+  GHCR_ACTOR: ${{ github.actor }}
 
 jobs:
   verify-version:
     name: verify-version
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     outputs:
       version: ${{ steps.resolve.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: prefix-dev/setup-pixi@ad1da6449d9e506fd127fd67ab2d054a769f6a94 # v0.11.2
-        with:
-          pixi-version: v0.70.2
-          cache: true
       - name: Resolve target version from tag
         id: resolve
         run: |
@@ -32,50 +35,20 @@ jobs:
           ref="${GITHUB_REF#refs/tags/v}"
           echo "version=${ref}" >> "$GITHUB_OUTPUT"
           echo "Target release version: ${ref}"
-      - name: Cross-check tag against pyproject.toml and __init__.py
+      - name: Cross-check tag against pyproject.toml, __init__.py, and CHANGELOG (in container)
         env:
           TARGET: ${{ steps.resolve.outputs.version }}
-        run: |
-          set -euo pipefail
-          pixi run python - <<'PY'
-          import ast, os, pathlib, sys, tomllib
-          target = os.environ["TARGET"]
-          pp = tomllib.load(open("pyproject.toml", "rb"))["project"]["version"]
-          init = pathlib.Path("src/telemachy/__init__.py").read_text()
-          init_ver = None
-          for node in ast.walk(ast.parse(init)):
-              if isinstance(node, ast.Assign):
-                  for t in node.targets:
-                      if isinstance(t, ast.Name) and t.id == "__version__":
-                          init_ver = ast.literal_eval(node.value)
-          mismatches = []
-          if pp != target:
-              mismatches.append(f"pyproject.toml ({pp}) != tag ({target})")
-          if init_ver != target:
-              mismatches.append(f"__init__.py ({init_ver}) != tag ({target})")
-          if mismatches:
-              print("Version sources disagree:")
-              for m in mismatches:
-                  print(f"  - {m}")
-              sys.exit(1)
-          print(f"All version sources agree on {target}")
-          PY
+        run: bash scripts/container_run.sh python3 ci/package_check.py release --tag "${TARGET}"
 
   build:
     name: build
     runs-on: ubuntu-24.04
     needs: verify-version
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: prefix-dev/setup-pixi@ad1da6449d9e506fd127fd67ab2d054a769f6a94 # v0.11.2
-        with:
-          pixi-version: v0.70.2
-          cache: true
-      - name: Build sdist and wheel
-        run: |
-          pip install build hatchling --quiet
-          python -m build --no-isolation
+      - name: Build sdist and wheel (in container)
+        run: bash scripts/run_ci_local.sh build
       - name: List built artifacts
         run: ls -la dist/
       - name: Upload dist artifacts

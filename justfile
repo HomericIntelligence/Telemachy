@@ -3,6 +3,11 @@
 AGAMEMNON_URL := env_var_or_default("AGAMEMNON_URL", "http://localhost:8080")
 NATS_URL      := env_var_or_default("NATS_URL", "nats://localhost:4222")
 
+# Every command below executes inside the fleet CI image that AchaeanFleet
+# publishes, so local results match the required checks. TELEMACHY_HOST=1 runs
+# the same command on the host instead (macOS, Windows, offline).
+CONTAINER := "./scripts/container_run.sh"
+
 # === Default ===
 
 default:
@@ -13,71 +18,75 @@ default:
 # Execute a workflow YAML file
 run WORKFLOW:
     AGAMEMNON_URL={{AGAMEMNON_URL}} NATS_URL={{NATS_URL}} \
-        pixi run python -m telemachy.cli run "{{WORKFLOW}}"
+        {{CONTAINER}} --network host \
+        pixi run --locked python -m telemachy.cli run "{{WORKFLOW}}"
 
 # Dry-run: show what would be created without executing
 plan WORKFLOW:
     AGAMEMNON_URL={{AGAMEMNON_URL}} NATS_URL={{NATS_URL}} \
-        pixi run python -m telemachy.cli plan "{{WORKFLOW}}"
+        {{CONTAINER}} --network host \
+        pixi run --locked python -m telemachy.cli plan "{{WORKFLOW}}"
 
 # Validate a workflow YAML without executing
 validate WORKFLOW:
-    pixi run python -m telemachy.cli validate "{{WORKFLOW}}"
+    {{CONTAINER}} pixi run --locked python -m telemachy.cli validate "{{WORKFLOW}}"
 
 # Export workflow JSON Schema for editor validation
 schema:
-    pixi run python -m telemachy.cli schema
+    {{CONTAINER}} pixi run --locked python -m telemachy.cli schema
 
 # === Development ===
 
 # Run the full test suite (unit + integration).
 test:
-    pixi run pytest
+    {{CONTAINER}} pixi run --locked pytest
 
 # Run only unit tests (everything outside tests/integration/)
 test-unit:
-    pixi run pytest -m "not integration" tests
+    {{CONTAINER}} pixi run --locked pytest -m "not integration" tests
 
 # Run only integration tests (mock-Agamemnon HTTP layer)
 test-integration:
-    pixi run pytest -m integration tests/integration
+    {{CONTAINER}} pixi run --locked pytest -m integration tests/integration
 
 # Run ruff linter
 lint:
-    pixi run ruff check src tests
+    {{CONTAINER}} pixi run --locked ruff check src tests
 
 # Run mypy static type checker
 mypy:
-    pixi run mypy src/telemachy --ignore-missing-imports
+    {{CONTAINER}} pixi run --locked mypy src/telemachy --ignore-missing-imports
 
 # Run Bandit SAST scan (medium+ severity)
 bandit:
-    pixi run python -m bandit -ll --ini .bandit -r src/telemachy
+    {{CONTAINER}} pixi run --locked python -m bandit -ll --ini .bandit -r src/telemachy
 
 # Format code with ruff
 format:
-    pixi run ruff format src tests
+    {{CONTAINER}} pixi run --locked ruff format src tests
 
-# Run the full local CI suite: lint, mypy, bandit, tests
-check: lint mypy bandit test
+# Run the full local CI suite: lint, mypy, bandit, tests. One container
+# invocation keeps the environment install to a single pass.
+check:
+    {{CONTAINER}} bash -c 'set -e; pixi run --locked ruff check src tests; pixi run --locked mypy src/telemachy --ignore-missing-imports; pixi run --locked python -m bandit -ll --ini .bandit -r src/telemachy; pixi run --locked pytest'
 
 # Evaluate the justfile with the CI image's just (host just may be too old).
 justfile-check:
     ./scripts/just_container.sh --evaluate
 
-# Focused checks in an explicitly provisioned environment; never runs a solver.
+# Focused checks in the same image, without the full suite.
 fleet-registration-test python='python3':
-    {{python}} -m pytest tests/test_fleet_registration.py tests/test_fleet_github.py tests/test_fleet_cli.py -q
+    {{CONTAINER}} {{python}} -m pytest tests/test_fleet_registration.py tests/test_fleet_github.py tests/test_fleet_cli.py -q
 
 fleet-registration-integration python='python3' nats_server='nats-server':
-    TELEMACHY_TEST_NATS_SERVER='{{nats_server}}' {{python}} -m pytest tests/integration/test_fleet_registration_transport.py -q
+    TELEMACHY_TEST_NATS_SERVER='{{nats_server}}' {{CONTAINER}} {{python}} -m pytest tests/integration/test_fleet_registration_transport.py -q
 
 # Explicit durable registration.
 [positional-arguments]
 fleet-register *args:
-    pixi run python -m telemachy.cli register-fleet-epic "$@"
+    {{CONTAINER}} --network host pixi run --locked python -m telemachy.cli register-fleet-epic "$@"
 
-# Install dev dependencies and set up pre-commit hooks
+# Install dev dependencies and set up pre-commit hooks on the host.
 bootstrap:
     pixi install
     pixi run pre-commit install
