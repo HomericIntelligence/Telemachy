@@ -7,6 +7,10 @@ verifies, and publishes. The image recipe lives in AchaeanFleet at
 [`ci/telemachy/`](https://github.com/HomericIntelligence/AchaeanFleet/tree/main/ci/telemachy);
 this repository consumes the published artifact and does not build it.
 
+`scripts/container_run.sh` is the only entry point that starts a container. The
+required checks, the release workflow, the local suite, and every `just` recipe
+call it, so one image, one credential, and one set of mounts serve all of them.
+
 ## Run the suite
 
 1. Install Podman or Docker. The image already carries Pixi, Just, Gitleaks,
@@ -75,6 +79,33 @@ without a credential fails before any check runs and names the missing
 variable. Fork pull requests receive no secrets, so their jobs cannot pull the
 image; run the suite from a branch in this repository or locally instead.
 
+## One entry point for commands
+
+`scripts/container_run.sh` resolves the image, authenticates the pull, mounts
+the checkout, and runs one command inside it. Recipes in the justfile call it
+directly, so `just test`, `just lint`, and `just validate` use the same
+toolchain as the required checks:
+
+```bash
+just test                       # pytest inside the CI image
+just validate workflows/example.yaml
+bash scripts/container_run.sh pixi run --locked ruff check src tests
+```
+
+The runner passes the documented settings (`AGAMEMNON_URL`, `NATS_URL`,
+`GITHUB_TOKEN`, `TELEMACHY_STATE_DIR`, and the rest of the table in the
+repository guide) into the container by name, so a value never appears in the
+process list. Workflow commands request the host network because Agamemnon and
+NATS listen on the host loopback; check commands stay isolated.
+
+`TELEMACHY_HOST=1` runs the same command on the host instead. Use it on macOS
+or Windows hosts without a container engine, offline, or when debugging a
+command that only reproduces outside the image:
+
+```bash
+TELEMACHY_HOST=1 just test
+```
+
 ## Host `just` older than the justfile
 
 `justfile-check` evaluates the task file with the image's pinned Just. A host
@@ -95,11 +126,14 @@ builds an image. `TELEMACHY_JUST_IMAGE` selects an explicit image, and
 
 ## Shared checks
 
-Container-backed hosted jobs use `scripts/run_ci_local.sh`, as the local
-recipes do. The hosted package, SAST, release, and suppression jobs invoke the
-same check implementation with the locked Pixi environment or standard-library
-Python, as applicable. Existing required check names, merge-queue policy, and
-tag-only publishing are preserved.
+Every hosted job runs its gate through `scripts/run_ci_local.sh`, as the local
+recipes do, including `forbid-suppressions`, `security/sast-scan`, `build`,
+`package`, `install`, and `release`. No job installs a toolchain on the runner.
+The exception is the library steps that only a GitHub Action can perform:
+artifact upload and download, SARIF upload, release creation, and the PyPI
+Trusted Publishing action. The tag-only release workflow runs its version
+cross-check and its build in the same image. Existing required check names,
+merge-queue policy, and tag-only publishing are preserved.
 
 | Subset | Enforced behavior |
 | --- | --- |
@@ -111,6 +145,7 @@ tag-only publishing are preserved.
 | `symlink-check` | Require every tracked symlink and its target to exist |
 | `unit-tests` | Preserve full-suite coverage of at least 75% |
 | `integration-tests` | Select integration tests, including the private JetStream broker |
+| `merge-queue-smoke` | Validate workflow YAML against the vendored GitHub-workflows schema, lint it, run the queue contract tests, and check symlinks |
 | `schema-validation` | Export the public workflow schema |
 | `security/secrets-scan` | Run Gitleaks with repository configuration, redaction, and a SARIF receipt; retain its exit status |
 | `security/dependency-scan` | Audit all external installed Python packages and the npm tool closure |

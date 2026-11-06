@@ -144,6 +144,13 @@ Closes #10"
 
 ## Building and Testing
 
+Every `just` recipe runs inside the Telemachy CI image that AchaeanFleet
+publishes, so a command that passes on your machine uses the toolchain the
+required checks use. Set `GHCR_TOKEN` once (see
+[the CI runbook](docs/ci/local-ci.md#pull-credentials)), or set
+`TELEMACHY_HOST=1` to run the same command on the host without a container
+engine.
+
 ### Test
 
 ```bash
@@ -167,11 +174,15 @@ contract, individual subsets, and environment storage.
 ### Lint and Format
 
 ```bash
-# Run linter (ruff)
+# Run linter (ruff) and the type checker
 just lint
+just mypy
 
 # Auto-format
 just format
+
+# One container invocation for lint, mypy, bandit, and tests
+just check
 ```
 
 ### Run Workflows

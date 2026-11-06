@@ -13,6 +13,11 @@ See `docs/backwards-compat.md`.
 
 ### Added
 
+- `scripts/container_run.sh`, the single entry point that runs any command in
+  the AchaeanFleet Telemachy CI image. It resolves the image, authenticates the
+  private pull, mounts the checkout, and forwards the documented settings by
+  name; `TELEMACHY_HOST=1` runs the same command on the host.
+
 - Provision the pinned, checksum-verified JetStream test broker in the existing
   Linux CI image so private-broker tests can run on clean CI hosts (Refs #338).
 
@@ -89,6 +94,14 @@ See `docs/backwards-compat.md`.
 - The unused `cryptography` runtime dependency.
 
 ### Changed
+
+- Every required job now runs its gate in the fleet CI image, including
+  `forbid-suppressions`, `security/sast-scan`, `build`, `package`, `install`,
+  and `release`; the runner installs no toolchain. The merge-queue smoke gate
+  and the tag-only release workflow moved to the same image.
+
+- All `just` recipes execute in that image, so local commands, the local CI
+  suite, and the required checks share one toolchain.
 
 - CI: the Telemachy CI image is now owned, built, and published by
   AchaeanFleet (`ci/telemachy/`) as

@@ -43,6 +43,7 @@ types-PyYAML    = ">=6.0"
 yamllint        = ">=1.26"
 respx           = ">=0.21"
 bandit          = ">=1.7.5"
+check-jsonschema = ">=0.39.0, <0.40"
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }
