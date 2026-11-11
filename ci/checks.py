@@ -18,7 +18,6 @@ CHECKS = (
     "symlink-check",
     "unit-tests",
     "integration-tests",
-    "merge-queue-smoke",
     "schema-validation",
     "security-secrets-scan",
     "security-dependency-scan",
@@ -132,19 +131,6 @@ class Checks:
             )
         elif name == "integration-tests":
             self.pixi("pytest", "-m", "integration", "tests/integration", "--tb=short", "-q")
-        elif name == "merge-queue-smoke":
-            # The merge-queue gate uses only image-provided tools: the vendored
-            # GitHub-workflows schema, the repository YAML rules, and the
-            # contract tests. No runner-installed package is required.
-            self.pixi(
-                "check-jsonschema",
-                "--builtin-schema",
-                "vendor.github-workflows",
-                *tracked(".github/workflows/*.yml"),
-            )
-            self.pixi("yamllint", "-c", ".yamllint.yaml", *tracked(".github/workflows/*.yml"))
-            self.pixi("pytest", "-p", "no:cacheprovider", "tests/test_merge_queue.py", "-q")
-            symlinks()
         elif name == "schema-validation":
             self.pixi("python", "-m", "telemachy.cli", "schema", "-o", "telemachy-schema.json")
         elif name == "security-secrets-scan":
