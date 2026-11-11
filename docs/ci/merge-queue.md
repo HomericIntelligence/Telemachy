@@ -43,6 +43,12 @@ Re-read live protection before each acceptance run; stop on any mismatch.
 The required workflow handles `push` to main, pull requests to main, and
 `merge_group` `checks_requested`. Every context runs its real gate on the queue
 commit. The tag-only `.github/workflows/release.yml` publisher remains separate.
+
+`_required.yml` also exposes one read-only `required-checks-gate` job with
+`if: always()` over every gating job. It parses `toJson(needs)` and fails closed
+unless every needed result is exactly `success`. The live required-context list
+does not include it yet; the ruleset cutover is tracked by #334, not this PR.
+
 The shared implementations and local equivalents are described in
 [local CI](local-ci.md).
 
