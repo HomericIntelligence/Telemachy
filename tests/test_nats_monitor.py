@@ -1,4 +1,10 @@
-"""Tests for NATS event monitoring."""
+"""Tests for the NATS task-lifecycle monitor.
+
+The monitor has one job: turn broker facts into a monotonic, terminal-sticky
+per-task status plus an awaitable event. These tests target that contract —
+status transitions, envelope handling, and connection lifecycle — rather than
+each accessor in isolation.
+"""
 
 from __future__ import annotations
 
@@ -12,311 +18,226 @@ import pytest
 from telemachy.nats_monitor import NatsMonitor, NatsUnavailableError
 
 
-class TestNatsMonitorBasics:
-    async def test_subscribe_team_uses_wildcard_subject(self) -> None:
-        """Test that subscribe_team constructs the correct wildcard subject."""
-        monitor = NatsMonitor("nats://localhost:4222")
+def _monitor() -> NatsMonitor:
+    return NatsMonitor("nats://localhost:4222")
 
-        # Mock the NATS client
-        mock_nc = AsyncMock()
-        mock_sub = AsyncMock()
-        mock_nc.subscribe.return_value = mock_sub
-        monitor._nc = mock_nc
 
-        await monitor.subscribe_team("team-001")
+def _msg(subject: str, payload: object) -> MagicMock:
+    msg = MagicMock()
+    msg.subject = subject
+    msg.data = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+    return msg
 
-        # Verify subscription used the correct wildcard
-        mock_nc.subscribe.assert_called_once()
-        subject = mock_nc.subscribe.call_args[0][0]
-        assert subject == "hi.tasks.team-001.*.*"
 
-    async def test_terminal_event_returns_asyncio_event(self) -> None:
-        """Test that terminal_event returns an asyncio.Event."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        ev = monitor.terminal_event("Task 1")
-        assert isinstance(ev, asyncio.Event)
-        assert not ev.is_set()
+def _envelope(data: object) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "event": "task.lifecycle",
+        "data": data,
+        "timestamp": "2026-06-03T00:00:00Z",
+        "request_id": "req-123",
+    }
 
-    async def test_terminal_event_returns_same_event_on_multiple_calls(self) -> None:
-        """Test that calling terminal_event twice returns the same Event."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        ev1 = monitor.terminal_event("Task 1")
-        ev2 = monitor.terminal_event("Task 1")
-        assert ev1 is ev2
 
-    async def test_latest_status_returns_none_initially(self) -> None:
-        """Test that latest_status returns None for unknown subjects."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        status = monitor.latest_status("Task 1")
-        assert status is None
+# === subscription and state accessors ===
 
-    def test_record_status_empty_subject_ignored(self) -> None:
-        """Test that record_status ignores empty subjects."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        monitor.record_status("", "completed")
-        assert monitor.latest_status("") is None
-        assert len(monitor._latest_status) == 0
 
-    def test_record_status_sets_status(self) -> None:
-        """Test that record_status sets the status."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        monitor.record_status("Task 1", "in_progress")
-        assert monitor.latest_status("Task 1") == "in_progress"
+async def test_subscribe_team_uses_task_family_wildcard() -> None:
+    monitor = _monitor()
+    nc = AsyncMock()
+    monitor._nc = nc
 
-    def test_terminal_status_is_sticky(self) -> None:
-        """Test that terminal status cannot be overwritten by non-terminal status."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        monitor.record_status("Task 1", "completed")
-        assert monitor.latest_status("Task 1") == "completed"
+    await monitor.subscribe_team("team-001")
+
+    nc.subscribe.assert_awaited_once()
+    assert nc.subscribe.call_args.args[0] == "hi.tasks.team-001.*.*"
+
+
+def test_state_accessors_start_empty_and_are_stable_per_subject() -> None:
+    monitor = _monitor()
+
+    first = monitor.terminal_event("Task 1")
+
+    assert isinstance(first, asyncio.Event)
+    assert not first.is_set()
+    assert monitor.terminal_event("Task 1") is first
+    assert monitor.terminal_event("Task 2") is not first
+    assert monitor.latest_status("Task 1") is None
+
+
+def test_record_status_is_terminal_sticky() -> None:
+    """A terminal status can move to another terminal status but never downgrade."""
+    monitor = _monitor()
+
+    monitor.record_status("Task 1", "in_progress")
+    assert monitor.latest_status("Task 1") == "in_progress"
+    assert not monitor.terminal_event("Task 1").is_set()
+
+    monitor.record_status("Task 1", "completed")
+    assert monitor.terminal_event("Task 1").is_set()
+
+    monitor.record_status("Task 1", "in_progress")
+    assert monitor.latest_status("Task 1") == "completed"
+
+    monitor.record_status("Task 1", "failed")
+    assert monitor.latest_status("Task 1") == "failed"
+
+    monitor.record_status("", "completed")
+    assert monitor.latest_status("") is None
+
+
+async def test_notify_submitted_wakes_one_waiter() -> None:
+    monitor = _monitor()
+    woke = asyncio.Event()
+
+    async def waiter() -> None:
+        await monitor.submitted_event.wait()
+        woke.set()
+
+    task = asyncio.create_task(waiter())
+    await asyncio.sleep(0.01)
+
+    monitor.notify_submitted()
+
+    await asyncio.wait_for(woke.wait(), timeout=1.0)
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+
+
+# === envelope handling ===
+
+
+@pytest.mark.parametrize(
+    ("subject", "data", "expected"),
+    [
+        pytest.param(
+            "hi.tasks.t1.task-1.completed",
+            {"subject": "Task 1", "status": "completed"},
+            "completed",
+            id="explicit-status",
+        ),
+        pytest.param(
+            "hi.tasks.t1.task-1.failed",
+            {"subject": "Task 1"},
+            "failed",
+            id="verb-fallback",
+        ),
+    ],
+)
+async def test_handle_msg_records_task_status(
+    subject: str, data: dict[str, object], expected: str
+) -> None:
+    monitor = _monitor()
+
+    await monitor._handle_msg(_msg(subject, _envelope(data)))
+
+    assert monitor.latest_status("Task 1") == expected
+    if expected in {"completed", "failed"}:
         assert monitor.terminal_event("Task 1").is_set()
 
-        # Try to downgrade to non-terminal status
-        monitor.record_status("Task 1", "in_progress")
-        # Should remain completed (sticky)
-        assert monitor.latest_status("Task 1") == "completed"
-        assert monitor.terminal_event("Task 1").is_set()
 
-    def test_record_status_terminal_to_terminal_transition_allowed(self) -> None:
-        """Test that one terminal status can transition to another terminal status."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        monitor.record_status("Task 1", "completed")
-        assert monitor.latest_status("Task 1") == "completed"
+@pytest.mark.parametrize(
+    ("payload", "warning"),
+    [
+        pytest.param(b"not valid json", "malformed NATS payload", id="bad-json"),
+        pytest.param(_envelope(42), "unexpected NATS envelope", id="non-dict-data"),
+        pytest.param(
+            _envelope({"subject": "", "status": "completed"}), "no data.subject", id="empty-subject"
+        ),
+    ],
+)
+async def test_malformed_envelope_is_logged_and_dropped(
+    payload: object, warning: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    monitor = _monitor()
 
-        # Transition to another terminal status
-        monitor.record_status("Task 1", "failed")
-        assert monitor.latest_status("Task 1") == "failed"
+    with caplog.at_level(logging.WARNING):
+        await monitor._handle_msg(_msg("hi.tasks.t1.task-1.completed", payload))
 
-    async def test_notify_submitted_sends_pulse(self) -> None:
-        """Test that notify_submitted wakes a waiting coroutine."""
-        monitor = NatsMonitor("nats://localhost:4222")
-
-        # Schedule a task that waits on the event
-        wait_done = asyncio.Event()
-
-        async def waiter() -> None:
-            await monitor.submitted_event.wait()
-            wait_done.set()
-
-        task = asyncio.create_task(waiter())
-        await asyncio.sleep(0.01)  # Let the waiter start
-
-        # Notify and check that the waiter woke up
-        monitor.notify_submitted()
-        await asyncio.wait_for(wait_done.wait(), timeout=1.0)
-
-        task.cancel()
-        # Wait for the cancelled task to finish unwinding; CancelledError
-        # is expected and swallowed by gather.
-        await asyncio.gather(task, return_exceptions=True)
+    assert warning in caplog.text
+    assert monitor._latest_status == {}
 
 
-class TestNatsMonitorMessageHandling:
-    async def test_handle_msg_sets_event_on_completed(self) -> None:
-        """Test that handling a completed message sets the terminal_event."""
-        monitor = NatsMonitor("nats://localhost:4222")
-
-        # Create a mock message
-        msg = MagicMock()
-        msg.subject = "hi.tasks.team-001.task-123.completed"
-        payload = {
-            "schema_version": 1,
-            "event": "task.completed",
-            "data": {
-                "subject": "Task 1",
-                "status": "completed",
-                "task_id": "t1",
-                "team_id": "tm1",
-            },
-            "timestamp": "2026-06-03T00:00:00Z",
-            "request_id": "req-123",
-        }
-        msg.data = json.dumps(payload).encode()
-
-        await monitor._handle_msg(msg)
-
-        assert monitor.latest_status("Task 1") == "completed"
-        assert monitor.terminal_event("Task 1").is_set()
-
-    async def test_handle_msg_falls_back_to_verb_when_status_missing(self) -> None:
-        """Test that status falls back to the subject verb when data.status is absent."""
-        monitor = NatsMonitor("nats://localhost:4222")
-
-        msg = MagicMock()
-        msg.subject = "hi.tasks.team-001.task-123.failed"
-        payload = {
-            "schema_version": 1,
-            "event": "task.failed",
-            "data": {
-                "subject": "Task 1",
-                # status is intentionally absent
-                "task_id": "t1",
-            },
-            "timestamp": "2026-06-03T00:00:00Z",
-            "request_id": "req-123",
-        }
-        msg.data = json.dumps(payload).encode()
-
-        await monitor._handle_msg(msg)
-
-        assert monitor.latest_status("Task 1") == "failed"
-
-    async def test_handle_msg_warns_and_drops_when_subject_empty(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """Test that a message with empty data.subject logs a warning and is dropped."""
-        monitor = NatsMonitor("nats://localhost:4222")
-
-        msg = MagicMock()
-        msg.subject = "hi.tasks.team-001.task-123.completed"
-        payload = {
-            "schema_version": 1,
-            "event": "task.completed",
-            "data": {
-                "subject": "",  # Empty
-                "status": "completed",
-            },
-            "timestamp": "2026-06-03T00:00:00Z",
-            "request_id": "req-123",
-        }
-        msg.data = json.dumps(payload).encode()
-
-        with caplog.at_level(logging.WARNING):
-            await monitor._handle_msg(msg)
-
-        assert len(monitor._events) == 0
-        assert "no data.subject" in caplog.text
-
-    async def test_handle_msg_warns_on_non_dict_data(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """Test that a malformed data (non-dict) logs a warning."""
-        monitor = NatsMonitor("nats://localhost:4222")
-
-        msg = MagicMock()
-        msg.subject = "hi.tasks.team-001.task-123.completed"
-        payload = {
-            "schema_version": 1,
-            "event": "task.completed",
-            "data": 42,  # Not a dict
-            "timestamp": "2026-06-03T00:00:00Z",
-            "request_id": "req-123",
-        }
-        msg.data = json.dumps(payload).encode()
-
-        with caplog.at_level(logging.WARNING):
-            await monitor._handle_msg(msg)
-
-        assert len(monitor._events) == 0
-        assert "unexpected NATS envelope" in caplog.text
-
-    async def test_handle_msg_warns_on_malformed_json(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """Test that malformed JSON is logged and dropped."""
-        monitor = NatsMonitor("nats://localhost:4222")
-
-        msg = MagicMock()
-        msg.subject = "hi.tasks.team-001.task-123.completed"
-        msg.data = b"not valid json"
-
-        with caplog.at_level(logging.WARNING):
-            await monitor._handle_msg(msg)
-
-        assert len(monitor._events) == 0
-        assert "malformed NATS payload" in caplog.text
+# === connection lifecycle ===
 
 
-class TestNatsMonitorConnection:
-    async def test_connect_timeout_raises_nats_unavailable(self) -> None:
-        """Test that a connection timeout raises NatsUnavailableError."""
-        monitor = NatsMonitor("nats://localhost:4222")
+@pytest.mark.parametrize(
+    "failure",
+    [
+        pytest.param(ConnectionRefusedError("refused"), id="refused"),
+        pytest.param(TimeoutError(), id="timeout"),
+    ],
+)
+async def test_unusable_broker_raises_nats_unavailable(failure: Exception) -> None:
+    monitor = _monitor()
 
-        async def slow_connect(*args: object, **kwargs: object) -> object:
-            await asyncio.sleep(10)
-            raise Exception("Should not get here")
+    async def fail(*_args: object, **_kwargs: object) -> object:
+        raise failure
 
-        with (
-            patch("nats.connect", side_effect=slow_connect),
-            pytest.raises(NatsUnavailableError, match="failed to connect"),
-        ):
-            async with monitor:
-                pass
+    with (
+        patch("nats.connect", side_effect=fail),
+        pytest.raises(NatsUnavailableError, match="failed to connect"),
+    ):
+        async with monitor:
+            pass
 
-    async def test_connect_refusal_raises_nats_unavailable(self) -> None:
-        """Test that a connection refusal raises NatsUnavailableError."""
-        monitor = NatsMonitor("nats://localhost:4222")
 
-        async def refuse_connect(*args: object, **kwargs: object) -> object:
-            raise ConnectionRefusedError("Connection refused")
-
-        with (
-            patch("nats.connect", side_effect=refuse_connect),
-            pytest.raises(NatsUnavailableError, match="failed to connect"),
-        ):
-            async with monitor:
-                pass
-
-    async def test_disconnect_callback_flips_connected_to_false(self) -> None:
-        """Test that _on_disconnected sets _broken flag."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        mock_nc = AsyncMock()
-        mock_nc.is_closed = False
-        monitor._nc = mock_nc
-        monitor._broken = asyncio.Event()
-
-        assert monitor.connected is True
-        await monitor._on_disconnected()
-        assert monitor.connected is False
-
-    async def test_drain_called_on_aexit(self) -> None:
-        """Test that __aexit__ calls drain on the NATS client."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        mock_nc = AsyncMock()
-        mock_nc.is_closed = False
-        monitor._nc = mock_nc
-
-        await monitor.__aexit__(None, None, None)
-
-        mock_nc.drain.assert_called_once()
-
-    async def test_drain_failure_logged_not_raised(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Test that drain errors are logged but do not raise."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        mock_nc = AsyncMock()
-        mock_nc.is_closed = False
-        mock_nc.drain.side_effect = Exception("Drain failed")
-        monitor._nc = mock_nc
-
-        with caplog.at_level(logging.WARNING):
-            # Should not raise
-            await monitor.__aexit__(None, None, None)
-
-        assert "NATS drain failed" in caplog.text
-        assert monitor._nc is None
-
-    async def test_connected_property_true_when_healthy(self) -> None:
-        """Test that connected returns True when NC is open and not broken."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        mock_nc = AsyncMock()
-        mock_nc.is_closed = False
-        monitor._nc = mock_nc
-        monitor._broken = asyncio.Event()
-
-        assert monitor.connected is True
-
-    async def test_connected_property_false_when_nc_is_none(self) -> None:
-        """Test that connected returns False when _nc is None."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        monitor._nc = None
-
-        assert monitor.connected is False
-
-    async def test_connected_property_false_when_broken(self) -> None:
-        """Test that connected returns False when _broken is set."""
-        monitor = NatsMonitor("nats://localhost:4222")
-        mock_nc = AsyncMock()
-        mock_nc.is_closed = False
-        monitor._nc = mock_nc
+@pytest.mark.parametrize(
+    ("nc_open", "broken", "expected"),
+    [
+        pytest.param(True, False, True, id="healthy"),
+        pytest.param(False, False, False, id="closed"),
+        pytest.param(True, True, False, id="broken-flag"),
+        pytest.param(None, False, False, id="no-client"),
+    ],
+)
+async def test_connected_reflects_client_and_break_flag(
+    nc_open: bool | None, broken: bool, expected: bool
+) -> None:
+    monitor = _monitor()
+    if nc_open is not None:
+        nc = AsyncMock()
+        nc.is_closed = not nc_open
+        monitor._nc = nc
+    if broken:
         monitor._broken.set()
 
-        assert monitor.connected is False
+    assert monitor.connected is expected
+
+
+async def test_disconnect_callback_marks_monitor_broken() -> None:
+    monitor = _monitor()
+    nc = AsyncMock()
+    nc.is_closed = False
+    monitor._nc = nc
+
+    await monitor._on_disconnected()
+
+    assert monitor.connected is False
+
+
+@pytest.mark.parametrize(
+    ("drain_error", "logged"),
+    [
+        pytest.param(None, None, id="drains"),
+        pytest.param(Exception("Drain failed"), "NATS drain failed", id="drain-error"),
+    ],
+)
+async def test_exit_drains_and_never_raises(
+    drain_error: Exception | None, logged: str | None, caplog: pytest.LogCaptureFixture
+) -> None:
+    monitor = _monitor()
+    nc = AsyncMock()
+    nc.is_closed = False
+    nc.drain.side_effect = drain_error
+    monitor._nc = nc
+
+    with caplog.at_level(logging.WARNING):
+        await monitor.__aexit__(None, None, None)
+
+    nc.drain.assert_awaited_once()
+    if logged is None:
+        assert not caplog.records
+    else:
+        assert logged in caplog.text
+    assert monitor._nc is None

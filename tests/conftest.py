@@ -122,6 +122,53 @@ def make_workflow_spec(**overrides: Any) -> WorkflowSpec:
     return WorkflowSpec.model_validate(make_workflow_dict(**overrides))
 
 
+def make_executor_spec(
+    agents: list[dict[str, Any]] | None = None,
+    tasks: list[dict[str, Any]] | None = None,
+    teardown: str = "on_completion",
+) -> WorkflowSpec:
+    """The canonical one-team workflow the executor tests drive.
+
+    Named ``test-wf`` because idempotency keys embed the workflow name; the
+    executor's reuse tests derive their keys from the same constant.
+    """
+    agents = agents or [{"name": "worker", "runtime": "local"}]
+    tasks = tasks or [{"subject": "Task 1", "description": "Do work", "assign_to": "worker"}]
+    return WorkflowSpec.model_validate(
+        {
+            "apiVersion": "telemachy/v1",
+            "metadata": {"name": "test-wf", "description": "test"},
+            "agents": agents,
+            "teams": [
+                {"name": "team-a", "agents": [a["name"] for a in agents], "tasks": tasks}
+            ],
+            "teardown": teardown,
+        }
+    )
+
+
+def make_mock_client() -> MagicMock:
+    """An AgamemnonClient stub on which every endpoint the executor calls succeeds.
+
+    Fresh instance per call so a test can override one endpoint without
+    affecting its siblings.
+    """
+    client = MagicMock(spec=AgamemnonClient)
+    client.create_agent = AsyncMock(return_value="agent-id-001")
+    client.wake_agent = AsyncMock()
+    client.hibernate_agent = AsyncMock()
+    client.delete_agent = AsyncMock()
+    client.list_agents = AsyncMock(return_value=[])
+    client.list_teams = AsyncMock(return_value=[])
+    client.ping = AsyncMock(return_value=True)
+    client.create_team = AsyncMock(return_value="team-id-001")
+    client.create_task = AsyncMock(return_value="task-id-001")
+    client.update_task = AsyncMock()
+    client.get_tasks = AsyncMock(return_value=[{"subject": "Task 1", "status": "completed"}])
+    client.delete_team = AsyncMock()
+    return client
+
+
 def make_two_task_dep_dict() -> dict[str, Any]:
     """Canonical two-agent / one-dependency workflow used by dependency tests."""
     return make_workflow_dict(
@@ -301,7 +348,7 @@ def load_workflow(path: Path) -> WorkflowSpec:
 # --- NATS event-driven monitor auto-mock (#3) ------------------------------
 
 
-def _create_mock_nats_monitor() -> MagicMock:
+def make_mock_monitor() -> MagicMock:
     """Create a mocked NatsMonitor with sensible defaults."""
     mock_monitor = MagicMock(spec=NatsMonitor)
     mock_monitor.__aenter__ = AsyncMock(return_value=mock_monitor)
@@ -336,7 +383,7 @@ def _create_mock_nats_monitor() -> MagicMock:
 @pytest.fixture
 def mock_nats_monitor() -> MagicMock:
     """Fixture that provides a mocked NatsMonitor with sensible defaults."""
-    return _create_mock_nats_monitor()
+    return make_mock_monitor()
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -361,7 +408,7 @@ def auto_patch_nats_monitor(request: pytest.FixtureRequest) -> asyncio.Iterator[
         return
 
     # Auto-patch NatsMonitor for all other tests
-    patcher = patch("telemachy.executor.NatsMonitor", return_value=_create_mock_nats_monitor())
+    patcher = patch("telemachy.executor.NatsMonitor", return_value=make_mock_monitor())
     patcher.start()
     yield
     patcher.stop()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Awaitable, Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -98,93 +99,71 @@ async def test_create_agent_raises_on_malformed_response() -> None:
 
 
 # ---------------------------------------------------------------------------
-# TEST 4 — retry on 503: two failures then success
+# TEST 4 — transient failures are retried, not surfaced (#165)
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    ("status", "failures"),
+    [
+        pytest.param(503, 2, id="5xx"),
+        pytest.param(429, 1, id="429-rate-limited"),
+    ],
+)
 @pytest.mark.asyncio
-async def test_create_agent_retries_on_503() -> None:
+async def test_create_agent_retries_transient_failures(status: int, failures: int) -> None:
+    """5xx and 429 answers are retried; the first success is returned."""
     client = await _enter_client()
-    fail_resp = _make_response(503, {"detail": "service unavailable"})
+    failure = _make_response(status, {"detail": "retry me"})
     ok_resp = _make_response(201, {"agent": {"id": "retry-id"}})
-
-    # 503, 503, then 201
-    mock_request = AsyncMock(side_effect=[fail_resp, fail_resp, ok_resp])
+    mock_request = AsyncMock(side_effect=[failure] * failures + [ok_resp])
 
     with (
         patch.object(client._client, "request", mock_request),
         patch("telemachy.agamemnon_client.asyncio.sleep", new_callable=AsyncMock),
     ):
-        agent_id = await client.create_agent(_local_agent_spec())
+        assert await client.create_agent(_local_agent_spec()) == "retry-id"
 
-    assert agent_id == "retry-id"
-    assert mock_request.call_count == 3
+    assert mock_request.call_count == failures + 1
 
 
 # ---------------------------------------------------------------------------
-# TEST 4b — retry on 429 rate-limit (#165)
+# TEST 5 — agent lifecycle calls hit their documented endpoints
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    ("method", "path", "call"),
+    [
+        pytest.param(
+            "POST",
+            "/v1/agents/agent-123/start",
+            lambda client: client.wake_agent("agent-123"),
+            id="wake",
+        ),
+        pytest.param(
+            "DELETE",
+            "/v1/agents/agent-123",
+            lambda client: client.delete_agent("agent-123"),
+            id="delete",
+        ),
+    ],
+)
 @pytest.mark.asyncio
-async def test_create_agent_retries_on_429() -> None:
-    """429 Too Many Requests must trigger retry, not be returned to caller."""
-    client = await _enter_client()
-    rate_limited = _make_response(429, {"detail": "rate limited"})
-    ok_resp = _make_response(201, {"agent": {"id": "rl-id"}})
-
-    mock_request = AsyncMock(side_effect=[rate_limited, ok_resp])
-
-    with (
-        patch.object(client._client, "request", mock_request),
-        patch("telemachy.agamemnon_client.asyncio.sleep", new_callable=AsyncMock),
-    ):
-        agent_id = await client.create_agent(_local_agent_spec())
-
-    assert agent_id == "rl-id"
-    assert mock_request.call_count == 2
-
-
-# ---------------------------------------------------------------------------
-# TEST 5 — start_agent calls correct endpoint
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_start_agent_calls_correct_endpoint() -> None:
+async def test_agent_lifecycle_endpoints(
+    method: str, path: str, call: Callable[[AgamemnonClient], Awaitable[None]]
+) -> None:
     client = await _enter_client()
     ok_resp = _make_response(200, {})
     ok_resp.is_error = False
-
     mock_request = AsyncMock(return_value=ok_resp)
+
     with patch.object(client._client, "request", mock_request):
-        await client.wake_agent("agent-123")
+        await call(client)
 
     mock_request.assert_called_once()
-    call_args = mock_request.call_args
-    assert call_args[0][0] == "POST"
-    assert "/v1/agents/agent-123/start" in call_args[0][1]
-
-
-# ---------------------------------------------------------------------------
-# TEST 6 — delete_agent calls correct endpoint
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_delete_agent_calls_correct_endpoint() -> None:
-    client = await _enter_client()
-    ok_resp = _make_response(204, {})
-    ok_resp.is_error = False
-
-    mock_request = AsyncMock(return_value=ok_resp)
-    with patch.object(client._client, "request", mock_request):
-        await client.delete_agent("agent-123")
-
-    mock_request.assert_called_once()
-    call_args = mock_request.call_args
-    assert call_args[0][0] == "DELETE"
-    assert "/v1/agents/agent-123" in call_args[0][1]
+    assert mock_request.call_args.args[0] == method
+    assert path in mock_request.call_args.args[1]
 
 
 # ---------------------------------------------------------------------------
@@ -303,18 +282,20 @@ async def test_rate_limiter_applies_to_all_endpoints() -> None:
 
 
 @pytest.mark.asyncio
-async def test_retry_backoff_capped_at_two_seconds() -> None:
-    """min(2**attempt, 2.0) — high attempts must not balloon backoff."""
+async def test_retry_backoff_is_capped_at_two_seconds() -> None:
+    """Backoff follows min(2**attempt, 2.0) — 1s then 2s, never 4s."""
     client = await _enter_client()
-    # Force three 500s; with cap, sleeps are 1s + 2s = 3s, not 1s + 2s = 3s either way at 3 attempts.
     err = _make_response(500, {"detail": "boom"})
-    with patch.object(client._client, "request", new_callable=AsyncMock, return_value=err):
-        start = time.monotonic()
-        with pytest.raises(AgamemnonError):
-            await client._request_with_retry("GET", "/v1/agents")
-        elapsed = time.monotonic() - start
-    # 3 attempts → 2 backoffs of 1s and 2s → ~3s; ceiling test allows slack.
-    assert elapsed <= 4.5
+    sleep = AsyncMock()
+
+    with (
+        patch.object(client._client, "request", new_callable=AsyncMock, return_value=err),
+        patch("telemachy.agamemnon_client.asyncio.sleep", sleep),
+        pytest.raises(AgamemnonError),
+    ):
+        await client._request_with_retry("GET", "/v1/agents")
+
+    assert [call.args[0] for call in sleep.await_args_list] == [1.0, 2.0]
 
 
 

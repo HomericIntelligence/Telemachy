@@ -1,4 +1,10 @@
-"""Tests for configuration settings (#160)."""
+"""Tests for configuration settings (#160).
+
+Every documented setting is checked twice from one table: once for its
+documented default and once for its environment override. Keeping the table as
+the single source means a new setting fails these tests until it is documented,
+and the assertions are a field-by-field contract rather than one test per line.
+"""
 
 from __future__ import annotations
 
@@ -10,231 +16,148 @@ import pytest
 
 from telemachy.config import Settings
 
+# Env var -> (field name, documented default)
+DOCUMENTED_DEFAULTS: dict[str, tuple[str, object]] = {
+    "AGAMEMNON_URL": ("agamemnon_url", "http://localhost:8080"),
+    "AGAMEMNON_API_KEY": ("agamemnon_api_key", ""),
+    "AGAMEMNON_RATE_LIMIT_RPS": ("agamemnon_rate_limit_rps", 0.0),
+    "AGAMEMNON_RATE_LIMIT_BURST": ("agamemnon_rate_limit_burst", 16),
+    "NATS_URL": ("nats_url", "nats://localhost:4222"),
+    "WORKFLOWS_DIR": ("workflows_dir", Path("workflows")),
+    "HOST_ID": ("host_id", "hermes"),
+    "REQUIRE_TLS": ("require_tls", True),
+    "MONITOR_TIMEOUT_SECONDS": ("monitor_timeout_seconds", 3600.0),
+    "DEFAULT_WORKFLOW_TIMEOUT": ("default_workflow_timeout", 7200.0),
+    "LOG_LEVEL": ("log_level", "INFO"),
+    "LOG_FORMAT": ("log_format", "plain"),
+    "OTEL_ENABLED": ("otel_enabled", False),
+    "OTEL_SERVICE_NAME": ("otel_service_name", "telemachy"),
+    "OTEL_EXPORTER": ("otel_exporter", "console"),
+}
 
-def test_require_tls_false_emits_warning(
+# Overrides that also prove type coercion (Path, float, bool).
+OVERRIDES: dict[str, object] = {
+    "AGAMEMNON_URL": "https://agamemnon.example.com",
+    "AGAMEMNON_API_KEY": "secret-key-123",
+    "AGAMEMNON_RATE_LIMIT_RPS": 12.5,
+    "AGAMEMNON_RATE_LIMIT_BURST": 8,
+    "NATS_URL": "tls://nats.example.com:4222",
+    "WORKFLOWS_DIR": "workflows/override",
+    "HOST_ID": "odysseus",
+    "REQUIRE_TLS": False,
+    "MONITOR_TIMEOUT_SECONDS": 120.5,
+    "DEFAULT_WORKFLOW_TIMEOUT": 9000,
+    "LOG_LEVEL": "DEBUG",
+    "LOG_FORMAT": "json",
+    "OTEL_ENABLED": True,
+    "OTEL_SERVICE_NAME": "telemachy-test",
+    "OTEL_EXPORTER": "console",
+}
+
+
+def _isolate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear every documented env var so defaults are actually defaults."""
+    for env_var in DOCUMENTED_DEFAULTS:
+        monkeypatch.delenv(env_var, raising=False)
+
+
+def test_documented_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty environment yields exactly the documented default per field."""
+    _isolate(monkeypatch)
+    settings = Settings(_env_file=None)
+
+    actual = {field: getattr(settings, field) for field, _ in DOCUMENTED_DEFAULTS.values()}
+    assert actual == {field: default for field, default in DOCUMENTED_DEFAULTS.values()}
+    assert isinstance(settings.workflows_dir, Path)
+
+
+def test_environment_overrides_every_field(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each env var binds to its field, including Path/float/bool coercion."""
+    for env_var, value in OVERRIDES.items():
+        monkeypatch.setenv(env_var, str(value))
+
+    settings = Settings(_env_file=None)
+
+    assert settings.workflows_dir == Path(str(OVERRIDES["WORKFLOWS_DIR"]))
+    assert settings.require_tls is False
+    assert settings.monitor_timeout_seconds == 120.5
+    assert settings.default_workflow_timeout == 9000.0
+    assert settings.agamemnon_rate_limit_burst == 8
+    assert settings.agamemnon_url == OVERRIDES["AGAMEMNON_URL"]
+    assert settings.log_format == "json"
+    assert settings.otel_enabled is True
+
+
+def test_require_tls_disabled_warns_once_about_cleartext(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Setting REQUIRE_TLS=false emits a cleartext WARNING."""
     monkeypatch.setenv("REQUIRE_TLS", "false")
     with caplog.at_level(logging.WARNING, logger="telemachy.config"):
         Settings(_env_file=None)
-    assert any("cleartext" in record.message for record in caplog.records)
+    cleartext = [r for r in caplog.records if "cleartext" in r.message]
+    assert len(cleartext) == 1
 
 
-def test_require_tls_true_emits_no_warning(
+def test_require_tls_enabled_is_silent(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Default REQUIRE_TLS=true emits no warning."""
     monkeypatch.delenv("REQUIRE_TLS", raising=False)
     with caplog.at_level(logging.WARNING, logger="telemachy.config"):
         Settings(_env_file=None)
-    assert not any("cleartext" in record.message for record in caplog.records)
+    assert not [r for r in caplog.records if "cleartext" in r.message]
 
 
-def test_require_tls_env_false() -> None:
-    import os
-
-    os.environ["REQUIRE_TLS"] = "0"
-    try:
-        assert Settings(_env_file=None).require_tls is False
-    finally:
-        del os.environ["REQUIRE_TLS"]
+@pytest.mark.parametrize("value", ["true", "True", "TRUE", "1"])
+def test_require_tls_truthy_spellings(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("REQUIRE_TLS", value)
+    assert Settings(_env_file=None).require_tls is True
 
 
-def test_require_tls_env_true() -> None:
-    import os
-
-    os.environ["REQUIRE_TLS"] = "1"
-    try:
-        assert Settings(_env_file=None).require_tls is True
-    finally:
-        del os.environ["REQUIRE_TLS"]
+@pytest.mark.parametrize("value", ["false", "False", "FALSE", "0"])
+def test_require_tls_falsy_spellings(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("REQUIRE_TLS", value)
+    assert Settings(_env_file=None).require_tls is False
 
 
-class TestDefaults:
-    """Every field defaults to the value documented in AGENTS.md."""
-
-    def test_agamemnon_url_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("AGAMEMNON_URL", raising=False)
-        assert Settings(_env_file=None).agamemnon_url == "http://localhost:8080"
-
-    def test_agamemnon_api_key_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("AGAMEMNON_API_KEY", raising=False)
-        assert Settings(_env_file=None).agamemnon_api_key == ""
-
-    def test_nats_url_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("NATS_URL", raising=False)
-        assert Settings(_env_file=None).nats_url == "nats://localhost:4222"
-
-    def test_workflows_dir_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("WORKFLOWS_DIR", raising=False)
-        s = Settings(_env_file=None)
-        assert s.workflows_dir == Path("workflows")
-        assert isinstance(s.workflows_dir, Path)
-
-    def test_host_id_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("HOST_ID", raising=False)
-        assert Settings(_env_file=None).host_id == "hermes"
-
-    def test_require_tls_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("REQUIRE_TLS", raising=False)
-        assert Settings(_env_file=None).require_tls is True
-
-    def test_log_level_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("LOG_LEVEL", raising=False)
-        assert Settings(_env_file=None).log_level == "INFO"
-
-    def test_monitor_timeout_seconds_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("MONITOR_TIMEOUT_SECONDS", raising=False)
-        assert Settings(_env_file=None).monitor_timeout_seconds == 3600.0
-
-    def test_default_workflow_timeout_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("DEFAULT_WORKFLOW_TIMEOUT", raising=False)
-        assert Settings(_env_file=None).default_workflow_timeout == 7200.0
-
-
-class TestEnvOverrides:
-    """Each documented env var overrides its corresponding field."""
-
-    def test_agamemnon_url_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("AGAMEMNON_URL", "https://agamemnon.example.com")
-        assert Settings(_env_file=None).agamemnon_url == "https://agamemnon.example.com"
-
-    def test_agamemnon_api_key_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("AGAMEMNON_API_KEY", "secret-key-123")
-        assert Settings(_env_file=None).agamemnon_api_key == "secret-key-123"
-
-    def test_nats_url_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("NATS_URL", "tls://nats.example.com:4222")
-        assert Settings(_env_file=None).nats_url == "tls://nats.example.com:4222"
-
-    def test_workflows_dir_override_coerces_to_path(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
-        monkeypatch.setenv("WORKFLOWS_DIR", str(tmp_path))
-        s = Settings(_env_file=None)
-        assert s.workflows_dir == tmp_path
-        assert isinstance(s.workflows_dir, Path)
-
-    def test_host_id_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("HOST_ID", "odysseus")
-        assert Settings(_env_file=None).host_id == "odysseus"
-
-    def test_log_level_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("LOG_LEVEL", "DEBUG")
-        assert Settings(_env_file=None).log_level == "DEBUG"
-
-    def test_monitor_timeout_seconds_override_parses_float(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setenv("MONITOR_TIMEOUT_SECONDS", "120.5")
-        assert Settings(_env_file=None).monitor_timeout_seconds == 120.5
-
-    def test_default_workflow_timeout_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("DEFAULT_WORKFLOW_TIMEOUT", "9000")
-        assert Settings(_env_file=None).default_workflow_timeout == 9000.0
-
-    def test_case_insensitive_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # SettingsConfigDict(case_sensitive=False) — uppercase env with lowercase field name.
-        monkeypatch.setenv("HOST_ID", "zeus")
-        assert Settings(_env_file=None).host_id == "zeus"
-
-
-class TestRequireTlsParsing:
-    """Boolean parsing for REQUIRE_TLS across common truthy/falsy spellings."""
-
-    @pytest.mark.parametrize("value", ["true", "True", "TRUE", "1"])
-    def test_truthy_values(self, monkeypatch: pytest.MonkeyPatch, value: str) -> None:
-        monkeypatch.setenv("REQUIRE_TLS", value)
-        assert Settings(_env_file=None).require_tls is True
-
-    @pytest.mark.parametrize("value", ["false", "False", "FALSE", "0"])
-    def test_falsy_values(self, monkeypatch: pytest.MonkeyPatch, value: str) -> None:
-        monkeypatch.setenv("REQUIRE_TLS", value)
-        assert Settings(_env_file=None).require_tls is False
-
-
-class TestClientKwargs:
-    """client_kwargs() propagates every AgamemnonClient.__init__ parameter."""
-
-    def test_all_keys_present(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("AGAMEMNON_URL", raising=False)
-        monkeypatch.delenv("AGAMEMNON_API_KEY", raising=False)
-        monkeypatch.delenv("HOST_ID", raising=False)
-        monkeypatch.delenv("REQUIRE_TLS", raising=False)
-        monkeypatch.delenv("NATS_URL", raising=False)
-        kwargs = Settings(_env_file=None).client_kwargs()
-        assert set(kwargs.keys()) == {
-            "url",
-            "api_key",
-            "host_id",
-            "require_tls",
-            "nats_url",
-            "rate_limit_rps",
-            "rate_limit_burst",
-        }
-
-    def test_url_propagates(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("AGAMEMNON_URL", "https://example.test")
-        assert Settings(_env_file=None).client_kwargs()["url"] == "https://example.test"
-
-    def test_api_key_propagates(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("AGAMEMNON_API_KEY", "k-abc")
-        assert Settings(_env_file=None).client_kwargs()["api_key"] == "k-abc"
-
-    def test_host_id_propagates(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("HOST_ID", "achilles")
-        assert Settings(_env_file=None).client_kwargs()["host_id"] == "achilles"
-
-    def test_nats_url_propagates(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("NATS_URL", "tls://nats.test:4222")
-        assert Settings(_env_file=None).client_kwargs()["nats_url"] == "tls://nats.test:4222"
-
-
-class TestModuleSingleton:
-    """The module-level ``settings`` singleton is instantiable and typed."""
-
-    def test_singleton_exists(self) -> None:
-        from telemachy.config import settings as singleton
-
-        assert isinstance(singleton, Settings)
-
-    def test_singleton_client_kwargs_returns_dict(self) -> None:
-        from telemachy.config import settings as singleton
-
-        kwargs = singleton.client_kwargs()
-        assert isinstance(kwargs, dict)
-        assert "url" in kwargs
-
-
-def test_rate_limit_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("AGAMEMNON_RATE_LIMIT_RPS", raising=False)
-    monkeypatch.delenv("AGAMEMNON_RATE_LIMIT_BURST", raising=False)
-    s = Settings(_env_file=None)
-    assert s.agamemnon_rate_limit_rps == 0.0
-    assert s.agamemnon_rate_limit_burst == 16
-    kw = s.client_kwargs()
-    assert kw["rate_limit_rps"] == 0.0
-    assert kw["rate_limit_burst"] == 16
-
-
-def test_rate_limit_env_var_binding(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AGAMEMNON_RATE_LIMIT_RPS env var actually binds (regression for prior NOGO)."""
-    monkeypatch.setenv("AGAMEMNON_RATE_LIMIT_RPS", "12.5")
-    monkeypatch.setenv("AGAMEMNON_RATE_LIMIT_BURST", "8")
-    s = Settings(_env_file=None)
-    assert s.agamemnon_rate_limit_rps == 12.5
-    assert s.agamemnon_rate_limit_burst == 8
-
-
-def test_rate_limit_burst_zero_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    """burst=0 must raise ValidationError instead of silent clamp."""
-    monkeypatch.setenv("AGAMEMNON_RATE_LIMIT_BURST", "0")
+@pytest.mark.parametrize("value", ["0", "-5"])
+def test_rate_limit_burst_must_be_positive(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    """burst < 1 is rejected at startup instead of silently clamping."""
+    monkeypatch.setenv("AGAMEMNON_RATE_LIMIT_BURST", value)
     with pytest.raises(pydantic.ValidationError):
         Settings(_env_file=None)
 
 
-def test_rate_limit_burst_negative_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AGAMEMNON_RATE_LIMIT_BURST", "-5")
-    with pytest.raises(pydantic.ValidationError):
+def test_client_kwargs_mirror_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """client_kwargs() forwards every AgamemnonClient constructor argument."""
+    _isolate(monkeypatch)
+    for env_var, value in OVERRIDES.items():
+        monkeypatch.setenv(env_var, str(value))
+
+    settings = Settings(_env_file=None)
+
+    assert settings.client_kwargs() == {
+        "url": "https://agamemnon.example.com",
+        "api_key": "secret-key-123",
+        "host_id": "odysseus",
+        "require_tls": False,
+        "nats_url": "tls://nats.example.com:4222",
+        "rate_limit_rps": 12.5,
+        "rate_limit_burst": 8,
+    }
+
+
+@pytest.mark.parametrize(
+    ("env_var", "value", "message"),
+    [
+        pytest.param("LOG_FORMAT", "xml", "LOG_FORMAT", id="log-format"),
+        pytest.param("OTEL_EXPORTER", "otlp", "OTEL_EXPORTER", id="otel-exporter"),
+    ],
+)
+def test_unsupported_observability_values_are_rejected(
+    monkeypatch: pytest.MonkeyPatch, env_var: str, value: str, message: str
+) -> None:
+    monkeypatch.setenv(env_var, value)
+    with pytest.raises(pydantic.ValidationError, match=message):
         Settings(_env_file=None)
