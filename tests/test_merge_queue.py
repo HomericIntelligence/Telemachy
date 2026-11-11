@@ -1,9 +1,13 @@
 """Regression tests for GitHub merge-queue readiness."""
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +17,7 @@ RELEASE_WORKFLOW = WORKFLOWS_DIR / "release.yml"
 SMOKE_WORKFLOW = WORKFLOWS_DIR / "merge-queue-smoke.yml"
 MERGE_QUEUE_POLICY = REPO_ROOT / "configs" / "github" / "merge-queue-policy.json"
 MERGE_QUEUE_RUNBOOK = REPO_ROOT / "docs" / "ci" / "merge-queue.md"
+REQUIRED_CHECKS_GATE = "required-checks-gate"
 
 EXPECTED_REQUIRED_CONTEXTS = [
     "build",
@@ -252,3 +257,89 @@ def test_release_publisher_remains_tag_only() -> None:
     assert on_block["push"] == {"tags": ["v*.*.*"]}
     assert "pull_request" not in on_block
     assert "merge_group" not in on_block
+
+
+def _gating_job_ids(workflow: dict[str, Any]) -> set[str]:
+    policy_contexts = set(_load_policy()["required_contexts"])
+    return {
+        job_id
+        for job_id, job in workflow["jobs"].items()
+        if job.get("name", job_id) in policy_contexts
+    }
+
+
+def _gate_job(workflow: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    matches = [
+        (job_id, job)
+        for job_id, job in workflow["jobs"].items()
+        if job_id == REQUIRED_CHECKS_GATE or job.get("name") == REQUIRED_CHECKS_GATE
+    ]
+    assert len(matches) == 1, matches
+    return matches[0]
+
+
+def _gate_script() -> str:
+    _, gate = _gate_job(_load_workflow(REQUIRED_WORKFLOW))
+    lines = gate["steps"][0]["run"].splitlines()
+    start = lines.index("python3 - <<'PY'") + 1
+    return "\n".join(lines[start : lines.index("PY", start)])
+
+
+def _run_gate(needs: dict[str, dict[str, str]]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-c", _gate_script()],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "NEEDS": json.dumps(needs)},
+        check=False,
+    )
+
+
+def test_required_checks_gate_is_one_read_only_aggregate() -> None:
+    workflow = _load_workflow(REQUIRED_WORKFLOW)
+    _, gate = _gate_job(workflow)
+
+    assert gate["name"] == REQUIRED_CHECKS_GATE
+    assert gate["if"] == "${{ always() }}"
+    assert gate["permissions"] == {"contents": "read"}
+    assert gate["timeout-minutes"] <= 10
+    assert "uses" not in gate
+
+    needs = gate["needs"]
+    actual_needs = {needs} if isinstance(needs, str) else set(needs)
+    assert actual_needs == _gating_job_ids(workflow)
+    assert REQUIRED_CHECKS_GATE not in actual_needs
+
+    assert len(gate["steps"]) == 1
+    step = gate["steps"][0]
+    assert "uses" not in step
+    assert step["env"] == {"NEEDS": "${{ toJson(needs) }}"}
+    for forbidden in ("actions/", "secrets.", "github.", "checkout", "pip ", "npm ", "curl", "wget"):
+        assert forbidden not in step["run"]
+
+
+@pytest.mark.parametrize("result", ["failure", "cancelled", "skipped", None])
+def test_required_checks_gate_rejects_every_non_success_result(result: str | None) -> None:
+    needs = {
+        "unit-tests": {"result": "success"},
+        "lint": {} if result is None else {"result": result},
+    }
+
+    completed = _run_gate(needs)
+
+    assert completed.returncode == 1
+    assert "required checks not successful" in completed.stderr
+
+
+def test_required_checks_gate_accepts_only_all_success() -> None:
+    completed = _run_gate({"unit-tests": {"result": "success"}, "lint": {"result": "success"}})
+
+    assert completed.returncode == 0
+    assert "all 2 required checks succeeded" in completed.stdout
+
+
+def test_required_checks_gate_rejects_an_empty_needs_payload() -> None:
+    completed = _run_gate({})
+
+    assert completed.returncode == 1
+    assert "required checks not successful" in completed.stderr
