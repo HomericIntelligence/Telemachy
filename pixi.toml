@@ -3,7 +3,7 @@ name = "project-telemachy"
 version = "0.1.0"
 description = "Declarative workflow engine for ProjectAgamemnon multi-agent workflows"
 channels = ["conda-forge"]
-platforms = ["linux-64", "linux-aarch64", "osx-arm64", "osx-64", "win-64"]
+platforms = ["linux-64", "linux-aarch64"]
 
 [dependencies]
 python = ">=3.13,<3.14"

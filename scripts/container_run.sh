@@ -43,8 +43,8 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-# The documented host escape hatch keeps macOS, Windows, and offline use
-# working without leaving the justfile recipes.
+# The documented host escape hatch keeps offline and host-only use working
+# without leaving the justfile recipes.
 if [ "${TELEMACHY_HOST:-0}" = "1" ]; then
     if [ "$#" -eq 0 ]; then
         echo 'container_run.sh requires a command' >&2

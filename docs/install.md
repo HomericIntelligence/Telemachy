@@ -16,8 +16,8 @@ pixi run just test
 ```
 
 This is the only installation path covered by CI and the test suite.
-The `pixi` solve covers `linux-64`, `osx-arm64`, `osx-64`, and `win-64`;
-all four are exercised in CI.
+The `pixi` solve covers `linux-64` and `linux-aarch64`; CI exercises
+`linux-64`.
 
 ### 2. `pip install --editable .` (contributor outside pixi)
 

@@ -5,7 +5,7 @@ NATS_URL      := env_var_or_default("NATS_URL", "nats://localhost:4222")
 
 # Every command below executes inside the fleet CI image that AchaeanFleet
 # publishes, so local results match the required checks. TELEMACHY_HOST=1 runs
-# the same command on the host instead (macOS, Windows, offline).
+# the same command on the host instead (offline or without a container engine).
 CONTAINER := "./scripts/container_run.sh"
 
 # === Default ===

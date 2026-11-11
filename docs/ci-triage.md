@@ -103,8 +103,6 @@ Verify every `runs-on:` uses a standard GitHub-hosted label:
 
 - `ubuntu-latest` (recommended)
 - `ubuntu-24.04` or `ubuntu-22.04` (specific versions)
-- `macos-latest`, `macos-13`, `macos-14`, `macos-15-xlarge` (macOS runners)
-- `windows-latest`, `windows-2022` (Windows runners)
 - A self-hosted label that you know is online and healthy
 
 **What to look for:**
