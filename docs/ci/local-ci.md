@@ -98,9 +98,9 @@ repository guide) into the container by name, so a value never appears in the
 process list. Workflow commands request the host network because Agamemnon and
 NATS listen on the host loopback; check commands stay isolated.
 
-`TELEMACHY_HOST=1` runs the same command on the host instead. Use it on macOS
-or Windows hosts without a container engine, offline, or when debugging a
-command that only reproduces outside the image:
+`TELEMACHY_HOST=1` runs the same command on the host instead. Use it on hosts
+without a container engine, offline, or when debugging a command that only
+reproduces outside the image:
 
 ```bash
 TELEMACHY_HOST=1 just test

@@ -118,9 +118,9 @@ See `docs/backwards-compat.md`.
 - CI: promote `forbid-suppressions`, `justfile-check`, `markdownlint`,
   `pixi-check`, and `symlink-check` to required merge-queue contexts
   (18 total).
-- pixi: expand `platforms` to `linux-64`, `osx-arm64`, `osx-64`, `win-64`
-  so contributors and operators on macOS and Windows can run
-  `pixi install` (#180).
+- pixi: limit `platforms` to `linux-64` and `linux-aarch64`. macOS and
+  Windows are no longer solved or supported; CI and release tooling run on
+  Linux only (reverses #180).
 - Settings: `client_kwargs()` helper deduplicates `AgamemnonClient`
   construction across CLI/executor call sites (#231).
 - Executor: tasks whose dependencies have failed are now skipped instead
