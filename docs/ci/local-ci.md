@@ -145,7 +145,6 @@ merge-queue policy, and tag-only publishing are preserved.
 | `symlink-check` | Require every tracked symlink and its target to exist |
 | `unit-tests` | Preserve full-suite coverage of at least 75% |
 | `integration-tests` | Select integration tests, including the private JetStream broker |
-| `merge-queue-smoke` | Validate workflow YAML against the vendored GitHub-workflows schema, lint it, run the queue contract tests, and check symlinks |
 | `schema-validation` | Export the public workflow schema |
 | `security/secrets-scan` | Run Gitleaks with repository configuration, redaction, and a SARIF receipt; retain its exit status |
 | `security/dependency-scan` | Audit all external installed Python packages and the npm tool closure |

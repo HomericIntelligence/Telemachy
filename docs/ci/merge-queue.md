@@ -6,8 +6,9 @@ checks; it does not activate the queue or write branch protection.
 
 PR #312 removed the full workflow's queue trigger in anticipation of a later
 smoke-only protection policy. That policy change was not applied. Restoring the
-real required checks preserves the current protection. The separate
-`merge-queue-smoke` workflow is advisory and cannot satisfy the required suite.
+real required checks preserves the current protection. `_required.yml` is the
+only required-context producer; no advisory carrier substitutes for a required
+context.
 
 ## Current policy and check mapping
 
@@ -60,8 +61,8 @@ of memory and 512 processes; workflow jobs retain their bounded timeouts.
 3. Let the authorized coordinator admit the designated pull request through the
    normal expected-head queue path. The commands below observe an existing
    entry; they do not enqueue or merge it.
-4. Bind the selected run to that entry's enqueue time and queue-head SHA. Wait
-   for all 18 actual contexts, not only the fast advisory smoke job.
+4. Bind the selected run to that entry's enqueue time and queue-head SHA.Wait
+for all 18 actual contexts.
 5. Preserve the raw rules, queue entry, workflow run and job/check responses.
    Record failure or non-completion honestly; a configuration test cannot prove
    that GitHub scheduled or passed a real queue run.
@@ -82,22 +83,22 @@ jq --slurpfile policy "${POLICY}" -e '
 ' "${RULES_JSON}"
 # Keep RULES_JSON with the acceptance evidence; no policy mutation is performed.
 
-SMOKE_PR=123  # Replace with the designated, already queued pull request.
+QUEUED_PR=123  # Replace with the designated, already queued pull request.
 OWNER="${REPO%%/*}"
 NAME="${REPO#*/}"
 REQUESTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-PR_HEAD_SHA="$(gh pr view "${SMOKE_PR}" --repo "${REPO}" \
+PR_HEAD_SHA="$(gh pr view "${QUEUED_PR}" --repo "${REPO}" \
   --json headRefOid --jq '.headRefOid')"
 test -n "${PR_HEAD_SHA}"
-printf 'smoke_pr=%s requested_at=%s pr_head_sha=%s\n' \
-  "${SMOKE_PR}" "${REQUESTED_AT}" "${PR_HEAD_SHA}"
+printf 'queued_pr=%s requested_at=%s pr_head_sha=%s\n' \
+  "${QUEUED_PR}" "${REQUESTED_AT}" "${PR_HEAD_SHA}"
 
 # Poll the designated PR until GitHub records its actual queue entry. The entry
 # provides both the authoritative enqueue time and that entry's queue head SHA.
 QUEUE_ENTRY=""
 for attempt in {1..60}; do
   QUEUE_ENTRY="$(gh api graphql \
-    -f owner="${OWNER}" -f name="${NAME}" -F number="${SMOKE_PR}" \
+    -f owner="${OWNER}" -f name="${NAME}" -F number="${QUEUED_PR}" \
     -f query='
       query($owner: String!, $name: String!, $number: Int!) {
         repository(owner: $owner, name: $name) {
@@ -121,11 +122,11 @@ test -n "${QUEUE_ENTRY}"
 
 ENQUEUED_AT="$(jq -r '.enqueuedAt' <<<"${QUEUE_ENTRY}")"
 QUEUE_HEAD_SHA="$(jq -r '.queueHeadSha' <<<"${QUEUE_ENTRY}")"
-CURRENT_PR_HEAD_SHA="$(gh pr view "${SMOKE_PR}" --repo "${REPO}" \
+CURRENT_PR_HEAD_SHA="$(gh pr view "${QUEUED_PR}" --repo "${REPO}" \
   --json headRefOid --jq '.headRefOid')"
 [[ "${CURRENT_PR_HEAD_SHA}" == "${PR_HEAD_SHA}" ]]
-printf 'smoke_pr=%s enqueued_at=%s pr_head_sha=%s queue_head_sha=%s\n' \
-  "${SMOKE_PR}" "${ENQUEUED_AT}" "${PR_HEAD_SHA}" "${QUEUE_HEAD_SHA}"
+printf 'queued_pr=%s enqueued_at=%s pr_head_sha=%s queue_head_sha=%s\n' \
+  "${QUEUED_PR}" "${ENQUEUED_AT}" "${PR_HEAD_SHA}" "${QUEUE_HEAD_SHA}"
 
 # Select only a newly-created merge_group run for this exact queue head. Do not
 # use the repository's latest merge-group run: it may belong to a different PR.
@@ -215,7 +216,7 @@ jq -e --arg queue_head_sha "${QUEUE_HEAD_SHA}" '
 ' "${CHECK_RUNS_JSON}"
 ```
 
-The selected run is tied to the designated smoke pull request through its merge
+The selected run is tied to the designated queued pull request through its merge
 queue entry, actual enqueue time, and exact queue head SHA. The job query then
 follows that run's `check_run_url` values. Both the required job names and their
 check-run names must equal the 18-context artifact exactly, without missing or

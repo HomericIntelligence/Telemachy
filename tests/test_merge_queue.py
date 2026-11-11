@@ -132,16 +132,47 @@ def test_queue_required_jobs_and_dependencies_have_no_event_exclusions() -> None
         pending.extend([needs] if isinstance(needs, str) else needs)
 
 
-def test_smoke_workflow_handles_merge_group_checks_requested_only() -> None:
-    on_block = _on_block(_load_workflow(SMOKE_WORKFLOW))
-    assert on_block == {"merge_group": {"types": ["checks_requested"]}}
+def test_required_workflow_is_the_only_pull_request_and_queue_producer() -> None:
+    required = set(_load_policy()["required_contexts"])
+    producers = []
+    for path in sorted(WORKFLOWS_DIR.glob("*.yml")):
+        workflow = _load_workflow(path)
+        on_block = _on_block(workflow)
+        if "pull_request" not in on_block and "merge_group" not in on_block:
+            continue
+        emitted = {
+            job.get("name", job_id) for job_id, job in workflow.get("jobs", {}).items()
+        }
+        if emitted & required:
+            producers.append(path.name)
+    assert producers == [REQUIRED_WORKFLOW.name]
 
 
-def test_smoke_workflow_runs_exactly_one_fast_smoke_job() -> None:
-    jobs = _load_workflow(SMOKE_WORKFLOW)["jobs"]
-    assert list(jobs) == ["merge-queue-smoke"]
-    assert jobs["merge-queue-smoke"]["name"] == "merge-queue-smoke"
-    assert jobs["merge-queue-smoke"]["timeout-minutes"] == 5
+def test_required_workflow_runs_the_same_contexts_for_pull_requests_and_queue_commits() -> None:
+    on_block = _on_block(_load_workflow(REQUIRED_WORKFLOW))
+    assert on_block["pull_request"] == {"branches": ["main"]}
+    assert on_block["merge_group"] == {"types": ["checks_requested"]}
+    assert on_block["push"] == {"branches": ["main"]}
+
+    jobs = _load_workflow(REQUIRED_WORKFLOW)["jobs"]
+    emitted = {job.get("name", job_id) for job_id, job in jobs.items()}
+    assert emitted & set(_load_policy()["required_contexts"]) == set(
+        _load_policy()["required_contexts"]
+    )
+
+
+def test_required_workflow_concurrency_is_event_scoped() -> None:
+    concurrency = _load_workflow(REQUIRED_WORKFLOW)["concurrency"]
+
+    assert concurrency["group"] == "required-${{ github.event_name }}-${{ github.ref }}"
+    assert concurrency["cancel-in-progress"] == "${{ github.event_name == 'pull_request' }}"
+
+
+def test_smoke_only_carrier_is_absent() -> None:
+    assert not SMOKE_WORKFLOW.exists()
+    assert "merge-queue-smoke" not in (REPO_ROOT / "ci" / "checks.py").read_text()
+    for path in WORKFLOWS_DIR.glob("*.yml"):
+        assert "merge-queue-smoke" not in path.read_text(), path.name
 
 
 def test_required_workflow_emits_every_policy_context_exactly_once() -> None:
@@ -173,11 +204,11 @@ def test_required_gitleaks_sarif_upload_runs_after_scan_failure() -> None:
     assert upload["if"] == "always() && hashFiles('gitleaks.sarif') != ''"
 
 
-def test_smoke_runbook_correlates_new_run_to_smoke_pr_queue_head() -> None:
+def test_queued_change_runbook_correlates_new_run_to_queue_head() -> None:
     runbook = MERGE_QUEUE_RUNBOOK.read_text()
 
     for marker in (
-        "SMOKE_PR=",
+        "QUEUED_PR=",
         "PR_HEAD_SHA=",
         "ENQUEUED_AT=",
         "QUEUE_HEAD_SHA=",
@@ -189,7 +220,7 @@ def test_smoke_runbook_correlates_new_run_to_smoke_pr_queue_head() -> None:
     assert "--limit 1" not in runbook
 
 
-def test_smoke_runbook_verifies_selected_run_terminal_result() -> None:
+def test_queued_change_runbook_verifies_selected_run_terminal_result() -> None:
     runbook = MERGE_QUEUE_RUNBOOK.read_text()
 
     for assertion in (
@@ -201,7 +232,7 @@ def test_smoke_runbook_verifies_selected_run_terminal_result() -> None:
         assert assertion in runbook
 
 
-def test_smoke_runbook_compares_exact_job_and_check_run_names_to_policy() -> None:
+def test_queued_change_runbook_compares_exact_job_and_check_run_names_to_policy() -> None:
     runbook = MERGE_QUEUE_RUNBOOK.read_text()
 
     assert 'EXPECTED="$(jq -c \'.required_contexts | sort\' "${POLICY}")"' in runbook
